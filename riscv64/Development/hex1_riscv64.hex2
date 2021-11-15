@@ -147,7 +147,7 @@ F3 00              ## e_machine Indicating RISC-V
     @First_pass_done 63 00 65 00 # RS1_A0 RS2_T1 @First_pass_done BEQ
 
     ; Check for :
-    13 03 A0 03     # RD_T1 !0x3a ADDI
+    13 03 A0 03     # RD_T1 !0x3A ADDI
     @First_pass_0 63 10 65 00 # RS1_A0 RS2_T1 @First_pass_0 BNE
     $StoreLabel EF 00 00 00 # RD_RA $StoreLabel JAL     ; Store this label
 
@@ -165,7 +165,7 @@ F3 00              ## e_machine Indicating RISC-V
     @Throwaway_token 63 00 65 00 # RS1_A0 RS2_T1 @Throwaway_token BEQ
 
     ; Check for ~
-    13 03 E0 07     # RD_T1 !0x7e ADDI
+    13 03 E0 07     # RD_T1 !0x7E ADDI
     @Throwaway_token 63 00 65 00 # RS1_A0 RS2_T1 @Throwaway_token BEQ
 
     93 05 F0 FF     # RD_A1 !-1 ADDI                    ; write = false
@@ -198,7 +198,7 @@ F3 00              ## e_machine Indicating RISC-V
     @Second_pass_done 63 00 65 00 # RS1_A0 RS2_T1 @Second_pass_done BEQ
 
     ; Drop the label
-    13 03 A0 03     # RD_T1 !0x3a ADDI
+    13 03 A0 03     # RD_T1 !0x3A ADDI
     @Second_pass_0 63 10 65 00 # RS1_A0 RS2_T1 @Second_pass_0 BNE
 
     $Read_byte EF 00 00 00 # RD_RA $Read_byte JAL       ; Read the label
@@ -218,7 +218,7 @@ F3 00              ## e_machine Indicating RISC-V
     @UpdateShiftRegister 63 00 65 00 # RS1_A0 RS2_T1 @UpdateShiftRegister BEQ
 
     ; Check for ~
-    13 03 E0 07     # RD_T1 !0x7e ADDI
+    13 03 E0 07     # RD_T1 !0x7E ADDI
     @UpdateShiftRegister 63 00 65 00 # RS1_A0 RS2_T1 @UpdateShiftRegister BEQ
 
     ; Deal with everything else
@@ -250,7 +250,7 @@ F3 00              ## e_machine Indicating RISC-V
     @UpdateShiftRegister_J 63 80 65 00 # RS1_A1 RS2_T1 @UpdateShiftRegister_J BEQ
 
     ; Check for ~
-    13 03 E0 07     # RD_T1 !0x7e ADDI
+    13 03 E0 07     # RD_T1 !0x7E ADDI
     @UpdateShiftRegister_U 63 80 65 00 # RS1_A1 RS2_T1 @UpdateShiftRegister_U BEQ
 
     $Second_pass_loop 6F 00 00 00 # $Second_pass_loop JAL ; continue looping
@@ -259,8 +259,8 @@ F3 00              ## e_machine Indicating RISC-V
     ; Corresponds to RISC-V I format
     13 05 45 00     # RD_A0 RS1_A0 !4 ADDI              ; add 4 due to this being 2nd part of AUIPC combo
 
-    37 13 00 00     # RD_T1 ~0xfff LUI                  ; load higher bits
-    1B 03 F3 FF     # RD_T1 RS1_T1 !0xfff ADDIW
+    37 13 00 00     # RD_T1 ~0xFFF LUI                  ; load higher bits
+    1B 03 F3 FF     # RD_T1 RS1_T1 !0xFFF ADDIW
     33 73 65 00     # RD_T1 RS1_A0 RS2_T1 AND           ; (value & 0xfff)
     93 1B 43 01     # RD_S7 RS1_T1 RS2_X20 SLLI         ; tempword = (value & 0xfff) << 20
     33 4C 7C 01     # RD_S8 RS1_S8 RS2_S7 XOR           ; shiftregister = shiftregister ^ tempword
@@ -275,11 +275,11 @@ F3 00              ## e_machine Indicating RISC-V
     ;          | ((value & 0x800) >> 4)           ; imm[11]
     ;          | ((value & 0x1000) << (31 - 12))  ; imm[12]
 
-    13 03 E0 01     # RD_T1 !0x1e ADDI
+    13 03 E0 01     # RD_T1 !0x1E ADDI
     33 73 65 00     # RD_T1 RS1_A0 RS2_T1 AND           ; value & 0x1e
     93 12 73 00     # RD_T0 RS1_T1 RS2_X7 SLLI          ; tempword = (value & 0x1e) << 7
 
-    13 03 00 7E     # RD_T1 !0x7e0 ADDI
+    13 03 00 7E     # RD_T1 !0x7E0 ADDI
     33 73 65 00     # RD_T1 RS1_A0 RS2_T1 AND           ; value & 0x7e0
     13 13 43 01     # RD_T1 RS1_T1 RS2_X20 SLLI         ; (value & 0x7e0) << (31 - 11)
     B3 E2 62 00     # RD_T0 RS1_T0 RS2_T1 OR            ; logical or with the previous expression
@@ -307,7 +307,7 @@ F3 00              ## e_machine Indicating RISC-V
     ;          | ((value & 0xff000))               ; imm[19:12]
     ;          | ((value & 0x100000) << (31 - 20)) ; imm[20]
 
-    13 03 E0 7F     # RD_T1 !0x7fe ADDI
+    13 03 E0 7F     # RD_T1 !0x7FE ADDI
     33 73 65 00     # RD_T1 RS1_A0 RS2_T1 AND           ; value & 0x7fe
     93 12 43 01     # RD_T0 RS1_T1 RS2_X20 SLLI         ; tempword = (value & 0x7fe) << 20
 
@@ -317,7 +317,7 @@ F3 00              ## e_machine Indicating RISC-V
     13 13 93 00     # RD_T1 RS1_T1 RS2_X9 SLLI          ; (value & 0x800) << (20 - 11)
     B3 E2 62 00     # RD_T0 RS1_T0 RS2_T1 OR            ; logical or with the previous expression
 
-    37 F3 0F 00     # RD_T1 ~0xff000 LUI                ; load higher bits
+    37 F3 0F 00     # RD_T1 ~0xFF000 LUI                ; load higher bits
     33 73 65 00     # RD_T1 RS1_A0 RS2_T1 AND           ; value & 0xff000
     B3 E2 62 00     # RD_T0 RS1_T0 RS2_T1 OR            ; logical or with the previous expression
 
@@ -336,8 +336,8 @@ F3 00              ## e_machine Indicating RISC-V
 
     B7 12 00 00     # RD_T0 ~0x800 LUI                  ; load higher bits
     9B 82 02 80     # RD_T0 RS1_T0 !0x800 ADDIW
-    37 13 00 00     # RD_T1 ~0xfff LUI                  ; load higher bits
-    1B 03 F3 FF     # RD_T1 RS1_T1 !0xfff ADDIW
+    37 13 00 00     # RD_T1 ~0xFFF LUI                  ; load higher bits
+    1B 03 F3 FF     # RD_T1 RS1_T1 !0xFFF ADDIW
 
     ; We are outside 31-bit that ~ can normally load
     B7 03 10 00     # RD_T2 ~0x100000 LUI               ; load 0xfffff000
@@ -383,7 +383,7 @@ F3 00              ## e_machine Indicating RISC-V
     ; write = true
     ; We calculate (hold * 16) + hex(c) ^ sr_nextb()
     ; First, calculate new shiftregister
-    93 02 F0 0F     # RD_T0 !0xff ADDI
+    93 02 F0 0F     # RD_T0 !0xFF ADDI
     B3 72 5C 00     # RD_T0 RS1_S8 RS2_T0 AND           ; sr_nextb = shiftregister & 0xff
     13 5C 8C 00     # RD_S8 RS1_S8 RS2_X8 SRLI          ; shiftregister >> 8
 
@@ -428,7 +428,7 @@ F3 00              ## e_machine Indicating RISC-V
     @ascii_comment 63 00 65 00 # RS1_A0 RS2_T1 @ascii_comment BEQ ; a0 eq to '#'
 
     ; deal with line comments starting with ;
-    13 03 B0 03     # RD_T1 !0x3b ADDI
+    13 03 B0 03     # RD_T1 !0x3B ADDI
     @ascii_comment 63 00 65 00 # RS1_A0 RS2_T1 @ascii_comment BEQ  ; a0 eq to ';'
 
     ; deal all ascii less than 0
@@ -436,7 +436,7 @@ F3 00              ## e_machine Indicating RISC-V
     @ascii_other 63 40 65 00 # RS1_A0 RS2_T1 @ascii_other BLT
 
     ; deal with 0-9
-    13 03 A0 03     # RD_T1 !0x3a ADDI
+    13 03 A0 03     # RD_T1 !0x3A ADDI
     @ascii_num 63 40 65 00 # RS1_A0 RS2_T1 @ascii_num BLT
 
     ; deal with all ascii less than A
@@ -475,9 +475,9 @@ F3 00              ## e_machine Indicating RISC-V
     $hex_return 6F 00 00 00 # $hex_return JAL           ; return
 :ascii_comment                        ; Read the comment until newline
     $Read_byte EF 00 00 00 # RD_RA $Read_byte JAL
-    13 03 D0 00     # RD_T1 !0xd ADDI                   ; CR
+    13 03 D0 00     # RD_T1 !0xD ADDI                   ; CR
     @ascii_comment_cr 63 00 65 00 # RS1_A0 RS2_T1 @ascii_comment_cr BEQ
-    13 03 A0 00     # RD_T1 !0xa ADDI                   ; LF
+    13 03 A0 00     # RD_T1 !0xA ADDI                   ; LF
     @ascii_comment 63 10 65 00 # RS1_A0 RS2_T1 @ascii_comment BNE  ; Keep reading comment
 :ascii_comment_cr
     13 08 F0 FF     # RD_A6 !-1 ADDI                    ; Return -1
