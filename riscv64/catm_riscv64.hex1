@@ -55,8 +55,8 @@ F3 00              ## e_machine Indicating RISC-V
 00 00 60 00 00 00 00 00 ## p_vaddr
 00 00 60 00 00 00 00 00 ## p_physaddr
 
-14 01 00 00 00 00 00 00 ## p_filesz
-14 01 00 00 00 00 00 00 ## p_memsz
+18 01 00 00 00 00 00 00 ## p_filesz
+18 01 00 00 00 00 00 00 ## p_memsz
 
 01 00 00 00 00 00 00 00 ## Required alignment
 
@@ -126,5 +126,5 @@ F3 00              ## e_machine Indicating RISC-V
     93 08 D0 05     # RD_A7 !93 ADDI                    ; sys_exit
     13 05 00 00     # RD_A0 ADDI                        ; Return code 0
     73 00 00 00     # ECALL                             ; exit(0)
-    
+
 #:ELF_end

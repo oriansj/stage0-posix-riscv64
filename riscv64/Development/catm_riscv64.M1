@@ -110,5 +110,5 @@ DEFINE RS2_A2  .0000C000
     RD_A7 !93 ADDI                    ; sys_exit
     RD_A0 ADDI                        ; Return code 0
     ECALL                             ; exit(0)
-    
+
 :ELF_end
