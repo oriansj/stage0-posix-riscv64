@@ -714,6 +714,7 @@
     # RS1_RA JALR                       ; return
     .00800000 67000000
 
+
 ; Set_Expression function
 ; Receives List in a0, CHAR* in a1 and CHAR* in a2
 ; Updates the list in place; does not modify registers
@@ -918,7 +919,7 @@
     # RD_SP RS1_SP !16 ADDI             ; deallocate stack
     .00010000 .00000100 .00000001 13000000
     # RS1_RA JALR                       ; return
-    .00800000 67000000                 ; return
+    .00800000 67000000
 
 
 ; Eval_Immediates function
