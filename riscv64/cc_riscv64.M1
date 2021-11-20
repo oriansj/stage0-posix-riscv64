@@ -1614,10 +1614,9 @@
     RD_A3 RS1_SP !24 LD               ; restore a3
     RD_A4 RS1_SP !32 LD               ; restore a4
     RD_A5 RS1_SP !40 LD               ; restore a5
-    RD_A6 RS1_SP !40 LD               ; restore a6
+    RD_A6 RS1_SP !48 LD               ; restore a6
     RD_SP RS1_SP !56 ADDI             ; deallocate stack
     RETURN
-
 
 
 ; lookup_member function
@@ -2035,6 +2034,7 @@
     RD_A2 RS1_SP !16 LD               ; restore a2
     RD_SP RS1_SP !24 ADDI             ; deallocate stack
     RETURN
+
 
 ; statement function
 ; Receives nothing
@@ -2849,7 +2849,7 @@
     RD_A0 RS1_A0 !1 ADDI              ; global_token->S + 1
     RD_RA $emit_out JAL               ; Emit it
 
-    RD_A0 ~process_asm_string_1 AUIPC ; ; Using "\n"
+    RD_A0 ~process_asm_string_1 AUIPC ; Using "\n"
     RD_A0 RS1_A0 !process_asm_string_1 ADDI
     RD_RA $emit_out JAL               ; Emit it
 
@@ -2939,7 +2939,7 @@
     RD_T0 ~break_target_head AUIPC    ; Get break_target_head
     RD_T0 RS1_T0 !break_target_head ADDI
     RD_A0 RS1_T0 LD                   ; Catch big error
-    RS1_A0 @process_break_bad BEQZ     ; Exit if IF(NULL == break_target_head)
+    RS1_A0 @process_break_bad BEQZ    ; Exit if IF(NULL == break_target_head)
 
     RD_A2 RS1_S11 !8 LD               ; I = function->locals
     RD_T0 ~break_frame AUIPC          ; Get break_frame
@@ -3978,7 +3978,7 @@
 
 :function_call_gen_done
     ; All is collected
-    RD_A0 ~function_call_string_6 AUIPC ; Using "ERROR in process_expression_list\nNo ) was found\n" SD\t#_process_expression2\n"
+    RD_A0 ~function_call_string_6 AUIPC ; Using "ERROR in process_expression_list\nNo ) was found\n"
     RD_A0 RS1_A0 !function_call_string_6 ADDI
     RD_A1 ~close_paren AUIPC          ; Using ")"
     RD_A1 RS1_A1 !close_paren ADDI
@@ -4268,6 +4268,7 @@
     RD_A2 RS1_SP !16 LD               ; restore a2
     RD_SP RS1_SP !24 ADDI             ; deallocate stack
     RETURN
+
 
 ; primary_expr_number function
 ; Receives nothing
