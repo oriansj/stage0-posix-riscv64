@@ -177,7 +177,7 @@ B2 03 00 00 00 00 00 00 ## p_memsz
     E3 8C 09 F4     # RS1_S3 @main_loop BEQZ            ; Loop if 0 == status
                     # -168B
 
-# :abort
+# :abort ; (0x0600160)
     17 05 00 00     # RD_A0 ~hard AUIPC                 ; Get error string
     13 05 25 23     # RD_A0 RS1_A0 !hard ADDI           ; Get error string
                     # +562B
