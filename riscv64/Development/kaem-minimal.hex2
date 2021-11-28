@@ -341,7 +341,7 @@ F3 00              ## e_machine Indicating RISC-V
     67 80 00 00     # RS1_RA JALR                       ; return
 
 # File_Print function
-# Receives CHAR* in EAX
+# Receives CHAR* in a0
 # calls fputc for every non-null char
 :File_Print
     13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
@@ -350,7 +350,7 @@ F3 00              ## e_machine Indicating RISC-V
     23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
     93 05 05 00     # RD_A1 RS1_A0 MV                   ; protect a0
 
-    63 00 05 00     # RS1_A0 @File_Print_Done BEQZ      ; Protect against nulls
+    @File_Print_Done 63 00 05 00 # RS1_A0 @File_Print_Done BEQZ ; Protect against nulls
 
 :File_Print_Loop
     03 C5 05 00     # RD_A0 RS1_A1 LBU                  ; Read byte
