@@ -1,5 +1,6 @@
 ## Copyright (C) 2021 Ekaitz Zarraga
 ## Copyright (C) 2021 Andrius Štikonas
+## Copyright (C) 2022 Gabriel Wicki
 ## This file is part of stage0.
 ##
 ## stage0 is free software: you can redistribute it and/or modify
@@ -29,15 +30,14 @@
 .global _start
 _start:
     li s4, 0              # Initialize to 0
-    ld a2, 16(sp)         # Input file name
+    ld a1, 16(sp)         # Input file name
 
     # Open input file and store FD in s2
     li a7, 56             # sys_openat
     li a0, -100           # AT_FDCWD
-    mv a1, a2             # input file
     li a2, 0              # read only
     ecall
-    mv s2, a0             # Save fd in for later
+    mv s2, a0             # Save fd in s2 for later
 
     # Open output file and store the FD in s3
     li a0, -100           # AT_FDCWD
@@ -51,7 +51,7 @@ _start:
     # S_IRWXU  00700
     # OCTAL!
     ecall
-    mv s3, a0             # Save fd in for later
+    mv s3, a0             # Save fd in s3 for later
 
 next_byte:
     li a7, 63             # sys_read
@@ -76,8 +76,8 @@ next_byte:
 
         # If the file ended (0 bytes read) terminate
         beqz a0, terminate
-        # Check if read byte is the end of the comment,
-        # in the case it is continue processing
+        # Check if read byte is the end of the comment (i.e. a newline character),
+        # in that case we continue processing
         lb a0, (sp)
         li t0, 0xA
         beq a0, t0, next_byte      # a0 eq to \n
