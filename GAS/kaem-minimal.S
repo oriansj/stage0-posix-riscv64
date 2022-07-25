@@ -26,7 +26,7 @@ _start:
     ld a2, 16(sp)                     # Input file name
 
     bnez a2, _start_out               # Use input file if specified
-    la a2, default_file               # Else use kaem.run
+    la a2, default_file               # Else use kaem.riscv64
 
 _start_out:
 

@@ -28,7 +28,7 @@
     RD_A2 RS1_SP !16 LD               # Input file name
 
     RS1_A2 @_start_out BNEZ           # Use input file if specified
-    # Else use kaem.run
+    # Else use kaem.riscv64
     RD_A2 ~default_file AUIPC         # load address of default_file
     RD_A2 RS1_A2 !default_file ADDI   # into register a2
 
