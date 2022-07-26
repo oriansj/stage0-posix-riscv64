@@ -1,0 +1,171 @@
+## Copyright (C) 2021 Andrius Štikonas
+## This file is part of stage0.
+##
+## stage0 is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+##
+## stage0 is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY# without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with stage0.  If not, see <http://www.gnu.org/licenses/>.
+
+
+## ELF Header
+
+:ELF_base
+7F 45 4C 46        ## e_ident[EI_MAG0-3] ELF's magic number
+
+02                 ## e_ident[EI_CLASS] Indicating 64 bit
+01                 ## e_ident[EI_DATA] Indicating little endianness
+01                 ## e_ident[EI_VERSION] Indicating original elf
+
+03                 ## e_ident[EI_OSABI] Set at 3 because FreeBSD is strict
+00                 ## e_ident[EI_ABIVERSION] Set at 0 because none cares
+
+00 00 00 00 00 00 00 ## e_ident[EI_PAD]
+02 00              ## e_type Indicating Executable
+F3 00              ## e_machine Indicating RISC-V
+01 00 00 00        ## e_version Indicating original elf
+
+&_start 00 00 00 00 ## e_entry Address of the entry point (Number of bytes this header is + Base Address)
+%ELF_program_headers>ELF_base 00 00 00 00 ## e_phoff Address of program header table
+00 00 00 00 00 00 00 00 ## e_shoff Address of section header table
+
+00 00 00 00        ## e_flags
+40 00              ## e_ehsize Indicating our 64 Byte header
+
+38 00              ## e_phentsize size of a program header table
+01 00              ## e_phnum number of entries in program table
+
+00 00              ## e_shentsize size of a section header table
+00 00              ## e_shnum number of entries in section table
+
+00 00              ## e_shstrndx index of the section names
+
+## Program Header
+:ELF_program_headers
+01 00 00 00             ## p_type
+07 00 00 00             ## ph_flags: PF-X|PF-W|PF-R = 7
+00 00 00 00 00 00 00 00 ## p_offset
+
+&ELF_base 00 00 00 00 ## p_vaddr
+&ELF_base 00 00 00 00 ## p_physaddr
+
+%ELF_end>ELF_base 00 00 00 00 ## p_filesz
+%ELF_end>ELF_base 00 00 00 00 ## p_memsz
+
+01 00 00 00 00 00 00 00 ## Required alignment
+
+:ELF_text
+
+; Simply jump to _start
+; Our main function
+:_start
+
+# Register use:
+# s1: output file descriptor
+# s2: buffer
+# s3: input file descriptor
+# s4: number of bytes read
+
+# Open output file and store the FD in s1
+    # RD_A7 !56 ADDI                    ; sys_openat
+    .80080000 .00008003 13000000
+    # RD_A0 !-100 ADDI                  ; AT_FDCWD
+    .00050000 .0000C0F9 13000000
+    # RD_SP RS1_SP !16 ADDI             ; Prepare stack for reading output file
+    .00010000 .00000100 .00000001 13000000
+    # RD_A1 RS1_SP LD                   ; Output file (argument 1)
+    .80050000 .00000100 03300000
+    # RD_A2 !577 ADDI                   ; Prepare file as O_WRONLY|O_CREAT|O_TRUNC
+    .00060000 .00001024 13000000
+    # RD_A3 !384 ADDI                   ; Prepare file as RW for owner only (600 in octal)
+    .80060000 .00000018 13000000
+    # ECALL                             ; syscall
+    73000000
+    # RD_S1 RS1_A0 ADDI                 ; Save fd in for later
+    .80040000 .00000500 13000000
+
+    # Prepare heap memory
+    # RD_A7 !214 ADDI                   ; sys_brk
+    .80080000 .0000600D 13000000
+    # RD_A0 ADDI                        ; Get current brk
+    .00050000 13000000
+    # ECALL                             ; syscall
+    73000000
+    # RD_S2 RS1_A0 ADDI                 ; Set our malloc pointer
+    .00090000 .00000500 13000000
+
+    # RD_A1 ~0x100000 LUI               ; a1=1MiB
+    .80050000 .00001000 37000000
+    # RD_A0 RS1_A0 RS2_A1 ADD           ; Allocate 1MiB
+    .00050000 .00000500 .0000B000 33000000
+    # ECALL                             ; syscall
+    73000000
+
+:core
+    # RD_SP RS1_SP !8 ADDI              ; Move stack pointer to next input file
+    .00010000 .00000100 .00008000 13000000
+    # RD_A1 RS1_SP LD                   ; Get the input file name
+    .80050000 .00000100 03300000
+    # RS1_A1 @Done BEQ                  ; This was the last file, we are done
+    .00800500 @Done 63000000
+
+    # RD_A7 !56 ADDI                    ; sys_openat
+    .80080000 .00008003 13000000
+    # RD_A0 !-100 ADDI                  ; AT_FDCWD
+    .00050000 .0000C0F9 13000000
+    # RD_A2 ADDI                        ; read only
+    .00060000 13000000
+    # ECALL                             ; syscall
+    73000000
+    # RD_S3 RS1_A0 ADDI                 ; protect input fd
+    .80090000 .00000500 13000000
+
+:keep
+    # RD_A7 !63 ADDI                    ; sys_read
+    .80080000 .0000F003 13000000
+    # RD_A0 RS1_S3 ADDI                 ; input fd
+    .00050000 .00800900 13000000
+    # RD_A1 RS1_S2 ADDI                 ; read into buffer
+    .80050000 .00000900 13000000
+    # RD_A2 ~0x100000 LUI               ; a2=1MiB
+    .00060000 .00001000 37000000
+    # ECALL                             ; syscall
+    73000000
+    # RD_S4 RS1_A0 ADDI                 ; actual number of bytes read
+    .000A0000 .00000500 13000000
+
+    # RD_A7 !64 ADDI                    ; sys_write
+    .80080000 .00000004 13000000
+    # RD_A0 RS1_S1 ADDI                 ; output fd
+    .00050000 .00800400 13000000
+    # RD_A1 RS1_S2 ADDI                 ; write from buffer
+    .80050000 .00000900 13000000
+    # RD_A2 RS1_S4 ADDI                 ; number of bytes to write
+    .00060000 .00000A00 13000000
+    # ECALL                             ; syscall
+    73000000
+
+    # RD_A2 ~0x100000 LUI               ; 1MiB
+    .00060000 .00001000 37000000
+    # RS1_S4 RS2_A2 @keep BEQ           ; keep looping if buffer was full
+    .00000A00 .0000C000 @keep 63000000
+    # $core JAL                         ; otherwise move to next file
+    $core 6F000000
+
+:Done
+    # Terminate program with 0 return code
+    # RD_A7 !93 ADDI                    ; sys_exit
+    .80080000 .0000D005 13000000
+    # RD_A0 ADDI                        ; Return code 0
+    .00050000 13000000
+    # ECALL                             ; exit(0)
+    73000000
+
+:ELF_end
