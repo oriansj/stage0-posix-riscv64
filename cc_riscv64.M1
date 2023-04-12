@@ -2075,7 +2075,7 @@
 
 :statement_local
     RD_A0 RS1_A1 MV                   ; put global_token->S in the right place
-    RD_A1 ~prim_types AUIPC           ; pointer to primative types
+    RD_A1 ~prim_types AUIPC           ; pointer to primitive types
     RD_A1 RS1_A1 !prim_types ADDI
     RD_RA $lookup_type JAL            ; See if found
     RS1_A0 @statement_local_success BNEZ ; Collect new local
