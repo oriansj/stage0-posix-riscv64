@@ -70,138 +70,138 @@ F3 00              ## e_machine Indicating RISC-V
 # s6: malloc pointer
 
 # M1 instructions are encoded into RISC-V words rather than individual hex characters.
-# E.g. RD_A0 RS1_SP LD = 00050000 + 00000100 + 03300000 = 03350100
+# E.g. rd_a0 rs1_sp ld = 00050000 + 00000100 + 03300000 = 03350100
 
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; Input file name
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; Input file name
 
-    @_start_out 63 10 06 00   # RS1_A2 @_start_out BNEZ           ; Use input file if specified
+    @_start_out 63 10 06 00   # rs1_a2 @_start_out bnez           ; Use input file if specified
     # Else use kaem.riscv64
-    ~default_file 17 06 00 00 # RD_A2 ~default_file AUIPC         ; load address of default_file
-    !default_file 13 06 06 00 # RD_A2 RS1_A2 !default_file ADDI   ; into register a2
+    ~default_file 17 06 00 00 # rd_a2 ~default_file auipc         ; load address of default_file
+    !default_file 13 06 06 00 # rd_a2 rs1_a2 !default_file addi   ; into register a2
 
 :_start_out
 
     # Open input file and store FD in s2
-    93 08 80 03     # RD_A7 !56 ADDI                    ; sys_openat
-    13 05 C0 F9     # RD_A0 !-100 ADDI                  ; AT_FDCWD
-    93 05 06 00     # RD_A1 RS1_A2 MV                   ; file name
-    13 06 00 00     # RD_A2 ADDI                        ; read only
-    73 00 00 00     # ECALL                             ; syscall
-    @Fail 63 40 05 00 # RS1_A0 @Fail BLTZ               ; Error opening file
-    13 09 05 00     # RD_S2 RS1_A0 MV                   ; Save fd in for later
+    93 08 80 03     # rd_a7 !56 addi                    ; sys_openat
+    13 05 C0 F9     # rd_a0 !-100 addi                  ; AT_FDCWD
+    93 05 06 00     # rd_a1 rs1_a2 mv                   ; file name
+    13 06 00 00     # rd_a2 addi                        ; read only
+    73 00 00 00     # ecall                             ; syscall
+    @Fail 63 40 05 00 # rs1_a0 @Fail bltz               ; Error opening file
+    13 09 05 00     # rd_s2 rs1_a0 mv                   ; Save fd in for later
 
     # Prepare heap memory
-    93 08 60 0D     # RD_A7 !214 ADDI                   ; sys_brk
-    13 05 00 00     # RD_A0 MV                          ; Get current brk
-    73 00 00 00     # ECALL                             ; syscall
-    13 0B 05 00     # RD_S6 RS1_A0 MV                   ; Set our malloc pointer
+    93 08 60 0D     # rd_a7 !214 addi                   ; sys_brk
+    13 05 00 00     # rd_a0 mv                          ; Get current brk
+    73 00 00 00     # ecall                             ; syscall
+    13 0B 05 00     # rd_s6 rs1_a0 mv                   ; Set our malloc pointer
 
 # Using a1 for tokens and a2 for tokens[i]
 :main_loop
-    13 05 10 00     # RD_A0 !1 ADDI                     ; 256 * sizeof(char*)
-    # RD_A0 RS1_A0 11 SLLI # replace 11 with 11-th register in rs2
-    13 15 B5 00     # RD_A0 RS1_A0 RS2_A1 SLLI          ; 2048 = 1 << 11
-    $malloc EF 00 00 00 # RD_RA $malloc JAL             ; allocate space
-    93 05 05 00     # RD_A1 RS1_A0 MV                   ; set tokens pointer
-    13 06 05 00     # RD_A2 RS1_A0 MV                   ; set tokens[i] pointer (i=0)
+    13 05 10 00     # rd_a0 !1 addi                     ; 256 * sizeof(char*)
+    # rd_a0 rs1_a0 11 slli # replace 11 with 11-th register in rs2
+    13 15 B5 00     # rd_a0 rs1_a0 rs2_a1 slli          ; 2048 = 1 << 11
+    $malloc EF 00 00 00 # rd_ra $malloc jal             ; allocate space
+    93 05 05 00     # rd_a1 rs1_a0 mv                   ; set tokens pointer
+    13 06 05 00     # rd_a2 rs1_a0 mv                   ; set tokens[i] pointer (i=0)
 
-    93 09 00 00     # RD_S3 MV                          ; status = 0
-    13 0A 00 00     # RD_S4 MV                          ; command_done = 0
+    93 09 00 00     # rd_s3 mv                          ; status = 0
+    13 0A 00 00     # rd_s4 mv                          ; command_done = 0
 
 :collect_command
-    $collect_token EF 00 00 00 # RD_RA $collect_token JAL ; Get another token
-    @collect_command_comment 63 00 05 00 # RS1_A0 @collect_command_comment BEQZ ; if NULL == result then it is a comment, don't store
+    $collect_token EF 00 00 00 # rd_ra $collect_token jal ; Get another token
+    @collect_command_comment 63 00 05 00 # rs1_a0 @collect_command_comment beqz ; if NULL == result then it is a comment, don't store
 
-    23 30 A6 00     # RS1_A2 RS2_A0 SD                  ; tokens[i] = result
-    13 06 86 00     # RD_A2 RS1_A2 !8 ADDI              ; i = i + 1 (sizeof(char*) = 8)
+    23 30 A6 00     # rs1_a2 rs2_a0 sd                  ; tokens[i] = result
+    13 06 86 00     # rd_a2 rs1_a2 !8 addi              ; i = i + 1 (sizeof(char*) = 8)
 
 :collect_command_comment
-    @collect_command 63 00 0A 00 # RS1_S4 @collect_command BEQZ ; keep looping if 0 == command_done
+    @collect_command 63 00 0A 00 # rs1_s4 @collect_command beqz ; keep looping if 0 == command_done
 
     # Deal with line comments
-    @main_loop 63 80 C5 00 # RS1_A1 RS2_A2 @main_loop BEQ ; keep looping if comment
+    @main_loop 63 80 C5 00 # rs1_a1 rs2_a2 @main_loop beq ; keep looping if comment
 
-    $print_command EF 00 00 00 # RD_RA $print_command JAL ; print the command
-    03 B5 05 00     # RD_A0 RS1_A1 LD                   ; program = tokens[0]
-    @Fail 63 00 05 00 # RS1_A0 @Fail BEQZ               ; Error, no program
+    $print_command EF 00 00 00 # rd_ra $print_command jal ; print the command
+    03 B5 05 00     # rd_a0 rs1_a1 ld                   ; program = tokens[0]
+    @Fail 63 00 05 00 # rs1_a0 @Fail beqz               ; Error, no program
 
-    13 01 81 FF     # RD_SP RS1_SP !-8 ADDI             ; allocate stack
-    23 30 B1 00     # RS1_SP RS2_A1 SD                  ; protect tokens
+    13 01 81 FF     # rd_sp rs1_sp !-8 addi             ; allocate stack
+    23 30 B1 00     # rs1_sp rs2_a1 sd                  ; protect tokens
 
-    93 08 C0 0D     # RD_A7 !220 ADDI                   ; sys_clone
-    13 05 10 01     # RD_A0 !17 ADDI                    ; SIGCHLD flag
-    93 05 00 00     # RD_A1 MV                          ; Child uses duplicate of parent's stack
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 C0 0D     # rd_a7 !220 addi                   ; sys_clone
+    13 05 10 01     # rd_a0 !17 addi                    ; SIGCHLD flag
+    93 05 00 00     # rd_a1 mv                          ; Child uses duplicate of parent's stack
+    73 00 00 00     # ecall                             ; syscall
 
-    83 35 01 00     # RD_A1 RS1_SP LD                   ; restore tokens
-    13 01 81 00     # RD_SP RS1_SP !8 ADDI              ; deallocate stack
+    83 35 01 00     # rd_a1 rs1_sp ld                   ; restore tokens
+    13 01 81 00     # rd_sp rs1_sp !8 addi              ; deallocate stack
 
-    @Fail 63 40 05 00 # RS1_A0 @Fail BLTZ               ; if f == -1 no child was created
-    @collect_command_parent 63 10 05 00 # RS1_A0 @collect_command_parent BNEZ ; if f == 0 it is child
+    @Fail 63 40 05 00 # rs1_a0 @Fail bltz               ; if f == -1 no child was created
+    @collect_command_parent 63 10 05 00 # rs1_a0 @collect_command_parent bnez ; if f == 0 it is child
 
     # Deal with child case
-    93 08 D0 0D     # RD_A7 !221 ADDI                   ; sys_execve
-    03 B5 05 00     # RD_A0 RS1_A1 LD                   ; program = tokens[0]
-    73 00 00 00     # ECALL                             ; execve(program, tokens)
-    $Fail EF 00 00 00 # RD_RA $Fail JAL                 ; Exit with an error
+    93 08 D0 0D     # rd_a7 !221 addi                   ; sys_execve
+    03 B5 05 00     # rd_a0 rs1_a1 ld                   ; program = tokens[0]
+    73 00 00 00     # ecall                             ; execve(program, tokens)
+    $Fail EF 00 00 00 # rd_ra $Fail jal                 ; Exit with an error
 
 :collect_command_parent
-    93 08 40 10     # RD_A7 !260 ADDI                   ; sys_wait4
-    13 06 00 00     # RD_A2 MV                          ; set options = 0
-    93 06 00 00     # RD_A3 MV                          ; set *ruseage = NULL
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 40 10     # rd_a7 !260 addi                   ; sys_wait4
+    13 06 00 00     # rd_a2 mv                          ; set options = 0
+    93 06 00 00     # rd_a3 mv                          ; set *ruseage = NULL
+    73 00 00 00     # ecall                             ; syscall
 
     # wait4 returns wstatus pointer, from which we can extract child's exit status
     # Check if child exited
-    83 B5 05 00     # RD_A1 RS1_A1 LD                   ; Dereference wstatus pointer
-    93 02 F0 07     # RD_T0 !0x7f ADDI                  ; t0 = 0x7f
-    B3 F2 55 00     # RD_T0 RS1_A1 RS2_T0 AND           ; WTERMSIG(s) ((s) & 0x7f)
-    @abort 63 90 02 00 # RS1_T0 @abort BNEZ             ; Something went wrong, child did not exit
+    83 B5 05 00     # rd_a1 rs1_a1 ld                   ; Dereference wstatus pointer
+    93 02 F0 07     # rd_t0 !0x7f addi                  ; t0 = 0x7f
+    B3 F2 55 00     # rd_t0 rs1_a1 rs2_t0 and           ; WTERMSIG(s) ((s) & 0x7f)
+    @abort 63 90 02 00 # rs1_t0 @abort bnez             ; Something went wrong, child did not exit
 
     # Check exit status: WEXITSTATUS(s) (((s) & 0xff00) >> 8)
-    B7 02 01 00     # RD_T0 ~0xff00 LUI                 ; 0xff00 = 0xffff - 0xff = 2^16 - 2^8
-    9B 82 02 F0     # RD_T0 RS1_T0 !-256 ADDIW          ; t0 = 0xff00
-    B3 F2 55 00     # RD_T0 RS1_A1 RS2_T0 AND           ; (s) & 0xff00
-    93 D9 82 00     # RD_S3 RS1_T0 RS2_X8 SRLI          ; Shift right by 8 to get status
+    B7 02 01 00     # rd_t0 ~0xff00 lui                 ; 0xff00 = 0xffff - 0xff = 2^16 - 2^8
+    9B 82 02 F0     # rd_t0 rs1_t0 !-256 addiw          ; t0 = 0xff00
+    B3 F2 55 00     # rd_t0 rs1_a1 rs2_t0 and           ; (s) & 0xff00
+    93 D9 82 00     # rd_s3 rs1_t0 rs2_x8 srli          ; Shift right by 8 to get status
 
-    @main_loop 63 80 09 00 # RS1_S3 @main_loop BEQZ     ; Loop if 0 == status
+    @main_loop 63 80 09 00 # rs1_s3 @main_loop beqz     ; Loop if 0 == status
 
 :abort
-    ~hard 17 05 00 00 # RD_A0 ~hard AUIPC               ; Get error string
-    !hard 13 05 05 00 # RD_A0 RS1_A0 !hard ADDI         ; Get error string
-    $File_Print EF 00 00 00 # RD_RA $File_Print JAL     ; Print it
-    $Fail 6F 00 00 00 # $Fail JAL                       ; Exit with failure
+    ~hard 17 05 00 00 # rd_a0 ~hard auipc               ; Get error string
+    !hard 13 05 05 00 # rd_a0 rs1_a0 !hard addi         ; Get error string
+    $File_Print EF 00 00 00 # rd_ra $File_Print jal     ; Print it
+    $Fail 6F 00 00 00 # $Fail jal                       ; Exit with failure
 
 
 # print_command function
 # Receives tokens[j] in a1 and tokens[i] in a2
 # Modifies a0
 :print_command
-    13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
-    23 30 11 00     # RS1_SP RS2_RA SD                  ; protect ra
-    23 34 B1 00     # RS1_SP RS2_A1 @8 SD               ; protect a1
-    23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
+    13 01 81 FE     # rd_sp rs1_sp !-24 addi            ; allocate stack
+    23 30 11 00     # rs1_sp rs2_ra sd                  ; protect ra
+    23 34 B1 00     # rs1_sp rs2_a1 @8 sd               ; protect a1
+    23 38 C1 00     # rs1_sp rs2_a2 @16 sd              ; protect a2
 
-    ~prefix 17 05 00 00 # RD_A0 ~prefix AUIPC           ; Get prefix " +> "
-    !prefix 13 05 05 00 # RD_A0 RS1_A0 !prefix ADDI     ; Get prefix " +> "
-    $File_Print EF 00 00 00 # RD_RA $File_Print JAL     ; print it
+    ~prefix 17 05 00 00 # rd_a0 ~prefix auipc           ; Get prefix " +> "
+    !prefix 13 05 05 00 # rd_a0 rs1_a0 !prefix addi     ; Get prefix " +> "
+    $File_Print EF 00 00 00 # rd_ra $File_Print jal     ; print it
 
 :print_command_loop
-    03 B5 05 00     # RD_A0 RS1_A1 LD                   ; get tokens[j]
-    $File_Print EF 00 00 00 # RD_RA $File_Print JAL     ; print it
-    93 85 85 00     # RD_A1 RS1_A1 !8 ADDI              ; j = j + 1
-    13 05 00 02     # RD_A0 !32 ADDI                    ; a0 = ' '
-    $fputc EF 00 00 00 # RD_RA $fputc JAL               ; print it
-    @print_command_loop 63 90 C5 00 # RS1_A1 RS2_A2 @print_command_loop BNE ; continue if j < i, otherwise keep looping
+    03 B5 05 00     # rd_a0 rs1_a1 ld                   ; get tokens[j]
+    $File_Print EF 00 00 00 # rd_ra $File_Print jal     ; print it
+    93 85 85 00     # rd_a1 rs1_a1 !8 addi              ; j = j + 1
+    13 05 00 02     # rd_a0 !32 addi                    ; a0 = ' '
+    $fputc EF 00 00 00 # rd_ra $fputc jal               ; print it
+    @print_command_loop 63 90 C5 00 # rs1_a1 rs2_a2 @print_command_loop bne ; continue if j < i, otherwise keep looping
 
-    13 05 A0 00     # RD_A0 !10 ADDI                    ; a0 = '\n'
-    $fputc EF 00 00 00 # RD_RA $fputc JAL               ; print it
+    13 05 A0 00     # rd_a0 !10 addi                    ; a0 = '\n'
+    $fputc EF 00 00 00 # rd_ra $fputc jal               ; print it
 
-    83 30 01 00     # RD_RA RS1_SP LD                   ; restore ra
-    83 35 81 00     # RD_A1 RS1_SP !8 LD                ; restore a1
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; restore a2
-    13 01 81 01     # RD_SP RS1_SP !24 ADDI             ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    83 30 01 00     # rd_ra rs1_sp ld                   ; restore ra
+    83 35 81 00     # rd_a1 rs1_sp !8 ld                ; restore a1
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; restore a2
+    13 01 81 01     # rd_sp rs1_sp !24 addi             ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 
 # collect_token function
@@ -209,67 +209,67 @@ F3 00              ## e_machine Indicating RISC-V
 # Overwrites a0
 # Uses a0 as c, a1 as token and a2 as token[i]
 :collect_token
-    13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
-    23 30 11 00     # RS1_SP RS2_RA SD                  ; protect ra
-    23 34 B1 00     # RS1_SP RS2_A1 @8 SD               ; protect a1
-    23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
+    13 01 81 FE     # rd_sp rs1_sp !-24 addi            ; allocate stack
+    23 30 11 00     # rs1_sp rs2_ra sd                  ; protect ra
+    23 34 B1 00     # rs1_sp rs2_a1 @8 sd               ; protect a1
+    23 38 C1 00     # rs1_sp rs2_a2 @16 sd              ; protect a2
 
-    37 15 00 00     # RD_A0 ~4096 LUI                   ; 4096 * sizeof(char)
-    $malloc EF 00 00 00 # RD_RA $malloc JAL             ; allocate space
-    93 05 05 00     # RD_A1 RS1_A0 MV                   ; token = malloc(max_string)
-    13 06 05 00     # RD_A2 RS1_A0 MV                   ; i = 0; set token[i]
+    37 15 00 00     # rd_a0 ~4096 lui                   ; 4096 * sizeof(char)
+    $malloc EF 00 00 00 # rd_ra $malloc jal             ; allocate space
+    93 05 05 00     # rd_a1 rs1_a0 mv                   ; token = malloc(max_string)
+    13 06 05 00     # rd_a2 rs1_a0 mv                   ; i = 0; set token[i]
 
 :collect_token_loop
-    $fgetc EF 00 00 00 # RD_RA $fgetc JAL               ; read character
-    93 02 C0 FF     # RD_T0 !-4 ADDI                    ; if character == EOF
-    @Done 63 00 55 00 # RS1_A0 RS2_T0 @Done BEQ         ; We are done
+    $fgetc EF 00 00 00 # rd_ra $fgetc jal               ; read character
+    93 02 C0 FF     # rd_t0 !-4 addi                    ; if character == EOF
+    @Done 63 00 55 00 # rs1_a0 rs2_t0 @Done beq         ; We are done
 
-    93 02 00 02     # RD_T0 !32 ADDI                    ; if c == ' '
-    @collect_token_done 63 00 55 00 # RS1_A0 RS2_T0 @collect_token_done BEQ ; Space terminates token
+    93 02 00 02     # rd_t0 !32 addi                    ; if c == ' '
+    @collect_token_done 63 00 55 00 # rs1_a0 rs2_t0 @collect_token_done beq ; Space terminates token
 
-    93 02 90 00     # RD_T0 !9 ADDI                     ; if c == '\t'
-    @collect_token_done 63 00 55 00 # RS1_A0 RS2_T0 @collect_token_done BEQ ; Tab terminates token
+    93 02 90 00     # rd_t0 !9 addi                     ; if c == '\t'
+    @collect_token_done 63 00 55 00 # rs1_a0 rs2_t0 @collect_token_done beq ; Tab terminates token
 
-    93 02 A0 00     # RD_T0 !10 ADDI                    ; continue if c == '\n'
-    @collect_token_comment 63 10 55 00 # RS1_A0 RS2_T0 @collect_token_comment BNE ; otherwise check next
+    93 02 A0 00     # rd_t0 !10 addi                    ; continue if c == '\n'
+    @collect_token_comment 63 10 55 00 # rs1_a0 rs2_t0 @collect_token_comment bne ; otherwise check next
 
     # newline
-    13 0A 10 00     # RD_S4 !1 ADDI                     ; command_done = true
-    $collect_token_done 6F 00 00 00 # $collect_token_done JAL ; Done with current command
+    13 0A 10 00     # rd_s4 !1 addi                     ; command_done = true
+    $collect_token_done 6F 00 00 00 # $collect_token_done jal ; Done with current command
 
 :collect_token_comment
-    93 02 30 02     # RD_T0 !35 ADDI                    ; if c == '#'
-    @collect_token_escape 63 10 55 00 # RS1_A0 RS2_T0 @collect_token_escape BNE ; otherwise check next
+    93 02 30 02     # rd_t0 !35 addi                    ; if c == '#'
+    @collect_token_escape 63 10 55 00 # rs1_a0 rs2_t0 @collect_token_escape bne ; otherwise check next
 
     # It is a line comment
-    $collect_comment EF 00 00 00 # RD_RA $collect_comment JAL ; Read whole comment
-    13 0A 10 00     # RD_S4 !1 ADDI                     ; command_done = true
-    $collect_token_done EF 00 00 00 # RD_RA $collect_token_done JAL ; Done
+    $collect_comment EF 00 00 00 # rd_ra $collect_comment jal ; Read whole comment
+    13 0A 10 00     # rd_s4 !1 addi                     ; command_done = true
+    $collect_token_done EF 00 00 00 # rd_ra $collect_token_done jal ; Done
 
 :collect_token_escape
-    93 02 C0 05     # RD_T0 !92 ADDI                    ; if c == '\'
-    @collect_token_other 63 10 55 00 # RS1_A0 RS2_T0 @collect_token_other BNE ; otherwise just store it
+    93 02 C0 05     # rd_t0 !92 addi                    ; if c == '\'
+    @collect_token_other 63 10 55 00 # rs1_a0 rs2_t0 @collect_token_other bne ; otherwise just store it
 
     # Escape character
-    $fgetc EF 00 00 00 # RD_RA $fgetc JAL               ; Read the char to drop
-    $collect_token_done EF 00 00 00 # RD_RA $collect_token_done JAL ; We are done
+    $fgetc EF 00 00 00 # rd_ra $fgetc jal               ; Read the char to drop
+    $collect_token_done EF 00 00 00 # rd_ra $collect_token_done jal ; We are done
 
 :collect_token_other
-    23 00 A6 00     # RS1_A2 RS2_A0 SB                  ; token[i] = c
-    13 06 16 00     # RD_A2 RS1_A2 !1 ADDI              ; i = i + 1
-    $collect_token_loop 6F 00 00 00 # $collect_token_loop JAL ; Read another character
+    23 00 A6 00     # rs1_a2 rs2_a0 sb                  ; token[i] = c
+    13 06 16 00     # rd_a2 rs1_a2 !1 addi              ; i = i + 1
+    $collect_token_loop 6F 00 00 00 # $collect_token_loop jal ; Read another character
 
 :collect_token_done
-    @collect_token_good 63 90 C5 00 # RS1_A1 RS2_A2 @collect_token_good BNE ; return the token unless
-    93 05 00 00     # RD_A1 MV                          ; i == 0, then token = NULL
+    @collect_token_good 63 90 C5 00 # rs1_a1 rs2_a2 @collect_token_good bne ; return the token unless
+    93 05 00 00     # rd_a1 mv                          ; i == 0, then token = NULL
 
 :collect_token_good
-    13 85 05 00     # RD_A0 RS1_A1 MV                   ; Return token
-    83 30 01 00     # RD_RA RS1_SP LD                   ; Restore ra
-    83 35 81 00     # RD_A1 RS1_SP !8 LD                ; Restore a1
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; Restore a2
-    13 01 81 01     # RD_SP RS1_SP !24 ADDI             ; Deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    13 85 05 00     # rd_a0 rs1_a1 mv                   ; Return token
+    83 30 01 00     # rd_ra rs1_sp ld                   ; Restore ra
+    83 35 81 00     # rd_a1 rs1_sp !8 ld                ; Restore a1
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; Restore a2
+    13 01 81 01     # rd_sp rs1_sp !24 addi             ; Deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 
 # collect_comment function
@@ -278,47 +278,47 @@ F3 00              ## e_machine Indicating RISC-V
 # uses a0 as c
 # Just throws away everything it reads
 :collect_comment
-    13 01 81 FF     # RD_SP RS1_SP !-8 ADDI             ; allocate stack
-    23 30 11 00     # RS1_SP RS2_RA SD                  ; protect ra
+    13 01 81 FF     # rd_sp rs1_sp !-8 addi             ; allocate stack
+    23 30 11 00     # rs1_sp rs2_ra sd                  ; protect ra
 
-    $fgetc EF 00 00 00 # RD_RA $fgetc JAL               ; c = fgetc(input)
-    93 02 C0 FF     # RD_T0 !-4 ADDI                    ; if c == EOF
-    @Fail 63 00 55 00 # RS1_A0 RS2_T0 @Fail BEQ         ; Abort
+    $fgetc EF 00 00 00 # rd_ra $fgetc jal               ; c = fgetc(input)
+    93 02 C0 FF     # rd_t0 !-4 addi                    ; if c == EOF
+    @Fail 63 00 55 00 # rs1_a0 rs2_t0 @Fail beq         ; Abort
 
-    93 02 A0 00     # RD_T0 !10 ADDI                    ; if c == '\n'
-    @collect_comment 63 10 55 00 # RS1_A0 RS2_T0 @collect_comment BNE ; loop
+    93 02 A0 00     # rd_t0 !10 addi                    ; if c == '\n'
+    @collect_comment 63 10 55 00 # rs1_a0 rs2_t0 @collect_comment bne ; loop
 
-    83 30 01 00     # RD_RA RS1_SP LD                   ; restore ra
-    13 01 81 00     # RD_SP RS1_SP !8 ADDI              ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    83 30 01 00     # rd_ra rs1_sp ld                   ; restore ra
+    13 01 81 00     # rd_sp rs1_sp !8 addi              ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 
 # fgetc function
 # Loads FILE* from s2
 # Returns -4 (EOF) or char in a0
 :fgetc
-    13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
-    23 34 B1 00     # RS1_SP RS2_A1 @8 SD               ; protect a1
-    23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
+    13 01 81 FE     # rd_sp rs1_sp !-24 addi            ; allocate stack
+    23 34 B1 00     # rs1_sp rs2_a1 @8 sd               ; protect a1
+    23 38 C1 00     # rs1_sp rs2_a2 @16 sd              ; protect a2
 
-    93 08 F0 03     # RD_A7 !63 ADDI                    ; sys_read
-    93 05 01 00     # RD_A1 RS1_SP MV                   ; Get stack address
-    13 05 09 00     # RD_A0 RS1_S2 MV                   ; read from input file
-    13 06 10 00     # RD_A2 !1 ADDI                     ; read 1 character
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 F0 03     # rd_a7 !63 addi                    ; sys_read
+    93 05 01 00     # rd_a1 rs1_sp mv                   ; Get stack address
+    13 05 09 00     # rd_a0 rs1_s2 mv                   ; read from input file
+    13 06 10 00     # rd_a2 !1 addi                     ; read 1 character
+    73 00 00 00     # ecall                             ; syscall
 
-    @fgetc_done 63 10 05 00 # RS1_A0 @fgetc_done BNEZ   ; Check if nothing was read
+    @fgetc_done 63 10 05 00 # rs1_a0 @fgetc_done bnez   ; Check if nothing was read
 
 :fgetc_fail
-    93 02 C0 FF     # RD_T0 !-4 ADDI                    ; Use -4 as EOF
-    23 80 55 00     # RS1_A1 RS2_T0 SB                  ; Store EOF in *a1
+    93 02 C0 FF     # rd_t0 !-4 addi                    ; Use -4 as EOF
+    23 80 55 00     # rs1_a1 rs2_t0 sb                  ; Store EOF in *a1
 
 :fgetc_done
-    03 85 05 00     # RD_A0 RS1_A1 LB                   ; return char in a0
-    83 35 81 00     # RD_A1 RS1_SP !8 LD                ; restore a1
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; restore a2
-    13 01 81 01     # RD_SP RS1_SP !24 ADDI             ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    03 85 05 00     # rd_a0 rs1_a1 lb                   ; return char in a0
+    83 35 81 00     # rd_a1 rs1_sp !8 ld                ; restore a1
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; restore a2
+    13 01 81 01     # rd_sp rs1_sp !24 addi             ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 
 # Malloc isn't actually required if the program being built fits in the initial memory
@@ -326,79 +326,79 @@ F3 00              ## e_machine Indicating RISC-V
 # Requires MALLOC pointer to be initialized and a0 to have the number of desired bytes
 
 :malloc
-    13 01 81 FF     # RD_SP RS1_SP !-8 ADDI             ; allocate stack
-    23 30 B1 00     # RS1_SP RS2_A1 SD                  ; protect a1
+    13 01 81 FF     # rd_sp rs1_sp !-8 addi             ; allocate stack
+    23 30 B1 00     # rs1_sp rs2_a1 sd                  ; protect a1
 
-    93 05 0B 00     # RD_A1 RS1_S6 MV                   ; Store the current pointer
-    33 05 65 01     # RD_A0 RS1_A0 RS2_S6 ADD           ; Request the number of desired bytes
-    93 08 60 0D     # RD_A7 !214 ADDI                   ; sys_brk
-    73 00 00 00     # ECALL                             ; syscall
-    13 0B 05 00     # RD_S6 RS1_A0 MV                   ; Set our malloc pointer
-    13 85 05 00     # RD_A0 RS1_A1 MV                   ; Return the pointer
+    93 05 0B 00     # rd_a1 rs1_s6 mv                   ; Store the current pointer
+    33 05 65 01     # rd_a0 rs1_a0 rs2_s6 add           ; Request the number of desired bytes
+    93 08 60 0D     # rd_a7 !214 addi                   ; sys_brk
+    73 00 00 00     # ecall                             ; syscall
+    13 0B 05 00     # rd_s6 rs1_a0 mv                   ; Set our malloc pointer
+    13 85 05 00     # rd_a0 rs1_a1 mv                   ; Return the pointer
 
-    83 35 01 00     # RD_A1 RS1_SP LD                   ; restore a1
-    13 01 81 00     # RD_SP RS1_SP !8 ADDI              ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    83 35 01 00     # rd_a1 rs1_sp ld                   ; restore a1
+    13 01 81 00     # rd_sp rs1_sp !8 addi              ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 # File_Print function
 # Receives CHAR* in a0
 # calls fputc for every non-null char
 :File_Print
-    13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
-    23 30 11 00     # RS1_SP RS2_RA SD                  ; protect ra
-    23 34 B1 00     # RS1_SP RS2_A1 @8 SD               ; protect a1
-    23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
-    93 05 05 00     # RD_A1 RS1_A0 MV                   ; protect a0
+    13 01 81 FE     # rd_sp rs1_sp !-24 addi            ; allocate stack
+    23 30 11 00     # rs1_sp rs2_ra sd                  ; protect ra
+    23 34 B1 00     # rs1_sp rs2_a1 @8 sd               ; protect a1
+    23 38 C1 00     # rs1_sp rs2_a2 @16 sd              ; protect a2
+    93 05 05 00     # rd_a1 rs1_a0 mv                   ; protect a0
 
-    @File_Print_Done 63 00 05 00 # RS1_A0 @File_Print_Done BEQZ ; Protect against nulls
+    @File_Print_Done 63 00 05 00 # rs1_a0 @File_Print_Done beqz ; Protect against nulls
 
 :File_Print_Loop
-    03 C5 05 00     # RD_A0 RS1_A1 LBU                  ; Read byte
-    @File_Print_Done 63 00 05 00 # RS1_A0 @File_Print_Done BEQZ ; Stop at NULL
+    03 C5 05 00     # rd_a0 rs1_a1 lbu                  ; Read byte
+    @File_Print_Done 63 00 05 00 # rs1_a0 @File_Print_Done beqz ; Stop at NULL
 
-    $fputc EF 00 00 00 # RD_RA $fputc JAL               ; print it
-    93 85 15 00     # RD_A1 RS1_A1 !1 ADDI              ; S = S + 1
-    $File_Print_Loop 6F 00 00 00 # $File_Print_Loop JAL ; Keep printing
+    $fputc EF 00 00 00 # rd_ra $fputc jal               ; print it
+    93 85 15 00     # rd_a1 rs1_a1 !1 addi              ; S = S + 1
+    $File_Print_Loop 6F 00 00 00 # $File_Print_Loop jal ; Keep printing
 
 :File_Print_Done
-    83 30 01 00     # RD_RA RS1_SP LD                   ; restore ra
-    83 35 81 00     # RD_A1 RS1_SP !8 LD                ; restore a1
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; restore a2
-    13 01 81 01     # RD_SP RS1_SP !24 ADDI             ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    83 30 01 00     # rd_ra rs1_sp ld                   ; restore ra
+    83 35 81 00     # rd_a1 rs1_sp !8 ld                ; restore a1
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; restore a2
+    13 01 81 01     # rd_sp rs1_sp !24 addi             ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 # fputc function
 # receives CHAR in a0 and load FILE* from stdout
 # writes char and returns
 :fputc
-    13 01 81 FE     # RD_SP RS1_SP !-24 ADDI            ; allocate stack
-    23 30 A1 00     # RS1_SP RS2_A0 SD                  ; protect a0
-    23 34 B1 00     # RS1_SP RS2_A1 @8 SD               ; protect a1
-    23 38 C1 00     # RS1_SP RS2_A2 @16 SD              ; protect a2
+    13 01 81 FE     # rd_sp rs1_sp !-24 addi            ; allocate stack
+    23 30 A1 00     # rs1_sp rs2_a0 sd                  ; protect a0
+    23 34 B1 00     # rs1_sp rs2_a1 @8 sd               ; protect a1
+    23 38 C1 00     # rs1_sp rs2_a2 @16 sd              ; protect a2
 
-    93 08 00 04     # RD_A7 !64 ADDI                    ; sys_write
-    13 05 10 00     # RD_A0 !1 ADDI                     ; write to stdout
-    93 05 01 00     # RD_A1 RS1_SP MV                   ; Get stack address
-    13 06 10 00     # RD_A2 !1 ADDI                     ; write 1 character
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 00 04     # rd_a7 !64 addi                    ; sys_write
+    13 05 10 00     # rd_a0 !1 addi                     ; write to stdout
+    93 05 01 00     # rd_a1 rs1_sp mv                   ; Get stack address
+    13 06 10 00     # rd_a2 !1 addi                     ; write 1 character
+    73 00 00 00     # ecall                             ; syscall
 
-    03 35 01 00     # RD_A0 RS1_SP LD                   ; restore a0
-    83 35 81 00     # RD_A1 RS1_SP !8 LD                ; restore a1
-    03 36 01 01     # RD_A2 RS1_SP !16 LD               ; restore a2
-    13 01 81 01     # RD_SP RS1_SP !24 ADDI             ; deallocate stack
-    67 80 00 00     # RS1_RA JALR                       ; return
+    03 35 01 00     # rd_a0 rs1_sp ld                   ; restore a0
+    83 35 81 00     # rd_a1 rs1_sp !8 ld                ; restore a1
+    03 36 01 01     # rd_a2 rs1_sp !16 ld               ; restore a2
+    13 01 81 01     # rd_sp rs1_sp !24 addi             ; deallocate stack
+    67 80 00 00     # rs1_ra jalr                       ; return
 
 :Done
     # Terminate program with 0 return code
-    93 08 D0 05     # RD_A7 !93 ADDI                    ; sys_exit
-    13 05 00 00     # RD_A0 MV                          ; Return code 0
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 D0 05     # rd_a7 !93 addi                    ; sys_exit
+    13 05 00 00     # rd_a0 mv                          ; Return code 0
+    73 00 00 00     # ecall                             ; syscall
 
 :Fail
     # Terminate program with 1 return code
-    93 08 D0 05     # RD_A7 !93 ADDI                    ; sys_exit
-    13 05 10 00     # RD_A0 !1 ADDI                     ; Return code 1
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 D0 05     # rd_a7 !93 addi                    ; sys_exit
+    13 05 10 00     # rd_a0 !1 addi                     ; Return code 1
+    73 00 00 00     # ecall                             ; syscall
 # PROGRAM END
 
 :default_file

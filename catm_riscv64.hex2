@@ -74,98 +74,98 @@ F3 00              ## e_machine Indicating RISC-V
 # s4: number of bytes read
 
 # Open output file and store the FD in s1
-    # RD_A7 !56 ADDI                    ; sys_openat
+    # rd_a7 !56 addi                    ; sys_openat
     .80080000 .00008003 13000000
-    # RD_A0 !-100 ADDI                  ; AT_FDCWD
+    # rd_a0 !-100 addi                  ; AT_FDCWD
     .00050000 .0000C0F9 13000000
-    # RD_SP RS1_SP !16 ADDI             ; Prepare stack for reading output file
+    # rd_sp rs1_sp !16 addi             ; Prepare stack for reading output file
     .00010000 .00000100 .00000001 13000000
-    # RD_A1 RS1_SP LD                   ; Output file (argument 1)
+    # rd_a1 rs1_sp ld                   ; Output file (argument 1)
     .80050000 .00000100 03300000
-    # RD_A2 !577 ADDI                   ; Prepare file as O_WRONLY|O_CREAT|O_TRUNC
+    # rd_a2 !577 addi                   ; Prepare file as O_WRONLY|O_CREAT|O_TRUNC
     .00060000 .00001024 13000000
-    # RD_A3 !384 ADDI                   ; Prepare file as RW for owner only (600 in octal)
+    # rd_a3 !384 addi                   ; Prepare file as RW for owner only (600 in octal)
     .80060000 .00000018 13000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
-    # RD_S1 RS1_A0 ADDI                 ; Save fd in for later
+    # rd_s1 rs1_a0 addi                 ; Save fd in for later
     .80040000 .00000500 13000000
 
     # Prepare heap memory
-    # RD_A7 !214 ADDI                   ; sys_brk
+    # rd_a7 !214 addi                   ; sys_brk
     .80080000 .0000600D 13000000
-    # RD_A0 ADDI                        ; Get current brk
+    # rd_a0 addi                        ; Get current brk
     .00050000 13000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
-    # RD_S2 RS1_A0 ADDI                 ; Set our malloc pointer
+    # rd_s2 rs1_a0 addi                 ; Set our malloc pointer
     .00090000 .00000500 13000000
 
-    # RD_A1 ~0x100000 LUI               ; a1=1MiB
+    # rd_a1 ~0x100000 lui               ; a1=1MiB
     .80050000 .00001000 37000000
-    # RD_A0 RS1_A0 RS2_A1 ADD           ; Allocate 1MiB
+    # rd_a0 rs1_a0 rs2_a1 add           ; Allocate 1MiB
     .00050000 .00000500 .0000B000 33000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
 
 :core
-    # RD_SP RS1_SP !8 ADDI              ; Move stack pointer to next input file
+    # rd_sp rs1_sp !8 addi              ; Move stack pointer to next input file
     .00010000 .00000100 .00008000 13000000
-    # RD_A1 RS1_SP LD                   ; Get the input file name
+    # rd_a1 rs1_sp ld                   ; Get the input file name
     .80050000 .00000100 03300000
-    # RS1_A1 @Done BEQ                  ; This was the last file, we are done
+    # rs1_a1 @Done beq                  ; This was the last file, we are done
     .00800500 @Done 63000000
 
-    # RD_A7 !56 ADDI                    ; sys_openat
+    # rd_a7 !56 addi                    ; sys_openat
     .80080000 .00008003 13000000
-    # RD_A0 !-100 ADDI                  ; AT_FDCWD
+    # rd_a0 !-100 addi                  ; AT_FDCWD
     .00050000 .0000C0F9 13000000
-    # RD_A2 ADDI                        ; read only
+    # rd_a2 addi                        ; read only
     .00060000 13000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
-    # RD_S3 RS1_A0 ADDI                 ; protect input fd
+    # rd_s3 rs1_a0 addi                 ; protect input fd
     .80090000 .00000500 13000000
 
 :keep
-    # RD_A7 !63 ADDI                    ; sys_read
+    # rd_a7 !63 addi                    ; sys_read
     .80080000 .0000F003 13000000
-    # RD_A0 RS1_S3 ADDI                 ; input fd
+    # rd_a0 rs1_s3 addi                 ; input fd
     .00050000 .00800900 13000000
-    # RD_A1 RS1_S2 ADDI                 ; read into buffer
+    # rd_a1 rs1_s2 addi                 ; read into buffer
     .80050000 .00000900 13000000
-    # RD_A2 ~0x100000 LUI               ; a2=1MiB
+    # rd_a2 ~0x100000 lui               ; a2=1MiB
     .00060000 .00001000 37000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
-    # RD_S4 RS1_A0 ADDI                 ; actual number of bytes read
+    # rd_s4 rs1_a0 addi                 ; actual number of bytes read
     .000A0000 .00000500 13000000
 
-    # RD_A7 !64 ADDI                    ; sys_write
+    # rd_a7 !64 addi                    ; sys_write
     .80080000 .00000004 13000000
-    # RD_A0 RS1_S1 ADDI                 ; output fd
+    # rd_a0 rs1_s1 addi                 ; output fd
     .00050000 .00800400 13000000
-    # RD_A1 RS1_S2 ADDI                 ; write from buffer
+    # rd_a1 rs1_s2 addi                 ; write from buffer
     .80050000 .00000900 13000000
-    # RD_A2 RS1_S4 ADDI                 ; number of bytes to write
+    # rd_a2 rs1_s4 addi                 ; number of bytes to write
     .00060000 .00000A00 13000000
-    # ECALL                             ; syscall
+    # ecall                             ; syscall
     73000000
 
-    # RD_A2 ~0x100000 LUI               ; 1MiB
+    # rd_a2 ~0x100000 lui               ; 1MiB
     .00060000 .00001000 37000000
-    # RS1_S4 RS2_A2 @keep BEQ           ; keep looping if buffer was full
+    # rs1_s4 rs2_a2 @keep beq           ; keep looping if buffer was full
     .00000A00 .0000C000 @keep 63000000
-    # $core JAL                         ; otherwise move to next file
+    # $core jal                         ; otherwise move to next file
     $core 6F000000
 
 :Done
     # Terminate program with 0 return code
-    # RD_A7 !93 ADDI                    ; sys_exit
+    # rd_a7 !93 addi                    ; sys_exit
     .80080000 .0000D005 13000000
-    # RD_A0 ADDI                        ; Return code 0
+    # rd_a0 addi                        ; Return code 0
     .00050000 13000000
-    # ECALL                             ; exit(0)
+    # ecall                             ; exit(0)
     73000000
 
 :ELF_end

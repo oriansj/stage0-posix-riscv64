@@ -73,189 +73,189 @@ F3 00              ## e_machine Indicating RISC-V
 01 00 00 00 00 00 00 00 ## Required alignment
 
 :_start
-    # RD_S4 MV                 ; Initialize register
+    # rd_s4 mv                 ; Initialize register
     .000A0000 13000000
-    # RD_A1 RS1_SP !16 LD      ; Input file name
+    # rd_a1 rs1_sp !16 ld      ; Input file name
     .80050000 .00000100 .00000001 03300000
 
     ; Open input file and store FD in s2
-    # RD_A7 !56 ADDI           ; sys_openat
+    # rd_a7 !56 addi           ; sys_openat
     .80080000 .00008003 13000000
-    # RD_A0 !-100 ADDI         ; AT_FDCWD
+    # rd_a0 !-100 addi         ; AT_FDCWD
     .00050000 .0000C0F9 13000000
-    # RD_A2 MV                 ; read only
+    # rd_a2 mv                 ; read only
     .00060000 13000000
-    # ECALL
+    # ecall
     73000000
-    # RD_S2 RS1_A0 MV          ; Save fd in s2 for later
+    # rd_s2 rs1_a0 mv          ; Save fd in s2 for later
     .00090000 .00000500 13000000
 
     ; Open output file and store the FD in s3
-    # RD_A0 !-100 ADDI         ; AT_FDCWD
+    # rd_a0 !-100 addi         ; AT_FDCWD
     .00050000 .0000C0F9 13000000
-    # RD_A1 RS1_SP !24 LD      ; Output file (argument 3)
+    # rd_a1 rs1_sp !24 ld      ; Output file (argument 3)
     .80050000 .00000100 .00008001 03300000
-    # RD_A2 !577 ADDI          ; octal 00001101
+    # rd_a2 !577 addi          ; octal 00001101
     .00060000 .00001024 13000000
     ; O_TRUNC   00001000
     ; O_CREAT   00000100
     ; O_WRONLY  00000001
     ; OCTAL!
-    # RD_A3 !448 ADDI          ; Set read, write, execute permission on user
+    # rd_a3 !448 addi          ; Set read, write, execute permission on user
     .80060000 .0000001C 13000000
     ; S_IRWXU  00700
     ; OCTAL!
-    # ECALL
+    # ecall
     73000000
-    # RD_S3 RS1_A0 MV          ; Save fd in s3 for later
+    # rd_s3 rs1_a0 mv          ; Save fd in s3 for later
     .80090000 .00000500 13000000
 
 :next_byte
-    # RD_A7 !63 ADDI           ; sys_read
+    # rd_a7 !63 addi           ; sys_read
     .80080000 .0000F003 13000000
-    # RD_A0 RS1_S2 MV          ; File descriptor
+    # rd_a0 rs1_s2 mv          ; File descriptor
     .00050000 .00000900 13000000
-    # RD_A1 RS1_SP MV          ; Buffer
+    # rd_a1 rs1_sp mv          ; Buffer
     .80050000 .00000100 13000000
-    # RD_A2 !1 ADDI            ; Size of what we want to read (set for all subsequent syscalls)
+    # rd_a2 !1 addi            ; Size of what we want to read (set for all subsequent syscalls)
     .00060000 .00001000 13000000
-    # ECALL
+    # ecall
     73000000
 
     ; If the file ended (0 bytes read) terminate
-    # RS1_A0 @terminate BEQZ
+    # rs1_a0 @terminate beqz
     .00000500 @terminate 63000000
 
     ; Check if it's a comment
-    # RD_A0 RS1_SP LB
+    # rd_a0 rs1_sp lb
     .00050000 .00000100 03000000
-    # RD_T0 !0x23 ADDI
+    # rd_t0 !0x23 addi
     .80020000 .00003002 13000000
-    # RS1_A0 RS2_T0 @loop BEQ  ; a0 eq to '#'
+    # rs1_a0 rs2_t0 @loop beq  ; a0 eq to '#'
     .00000500 .00005000 @loop 63000000
-    # RD_T0 !0x3B ADDI
+    # rd_t0 !0x3B addi
     .80020000 .0000B003 13000000
-    # RS1_A0 RS2_T0 @loop BEQ  ; a0 eq to ';'
+    # rs1_a0 rs2_t0 @loop beq  ; a0 eq to ';'
     .00000500 .00005000 @loop 63000000
-    # $not_comment JAL
+    # $not_comment jal
     $not_comment 6F000000
 :loop
-        # RD_A0 RS1_S2 MV              ; File descriptor
+        # rd_a0 rs1_s2 mv              ; File descriptor
         .00050000 .00000900 13000000
-        # ECALL                        ; sys_read
+        # ecall                        ; sys_read
         73000000
 
         ; If the file ended (0 bytes read) terminate
-        # RS1_A0 @terminate BEQZ
+        # rs1_a0 @terminate beqz
         .00000500 @terminate 63000000
         ; Check if read byte is the end of the comment (i.e. a newline character),
         ; in that case we continue processing
-        # RD_A0 RS1_SP LB
+        # rd_a0 rs1_sp lb
         .00050000 .00000100 03000000
-        # RD_T0 !0xA ADDI
+        # rd_t0 !0xA addi
         .80020000 .0000A000 13000000
-        # RS1_A0 RS2_T0 @next_byte BEQ ; a0 eq to \n
+        # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \n
         .00000500 .00005000 @next_byte 63000000
-        # RD_T0 !0xD ADDI
+        # rd_t0 !0xD addi
         .80020000 .0000D000 13000000
-        # RS1_A0 RS2_T0 @next_byte BEQ ; a0 eq to \r
+        # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \r
         .00000500 .00005000 @next_byte 63000000
-    # $loop JAL
+    # $loop jal
     $loop 6F000000
 :not_comment
     ; Check if it's a hex character:
     ; in the case it's not, ignores and reads next byte
-    # RD_A0 RS1_SP LB
+    # rd_a0 rs1_sp lb
     .00050000 .00000100 03000000
 
     ; Is it between '0' and '9'?
-    # RD_T0 !48 ADDI           ; '0' character
+    # rd_t0 !48 addi           ; '0' character
     .80020000 .00000003 13000000
-    # RS1_A0 RS2_T0 @uppercase_alpha BLT
+    # rs1_a0 rs2_t0 @uppercase_alpha blt
     .00000500 .00005000 @uppercase_alpha 63400000
-    # RD_T0 !57 ADDI           ; '9' character
+    # rd_t0 !57 addi           ; '9' character
     .80020000 .00009003 13000000
-    # RS1_T0 RS2_A0 @uppercase_alpha BLT
+    # rs1_t0 rs2_a0 @uppercase_alpha blt
     .00800200 .0000A000 @uppercase_alpha 63400000
-    # RD_A0 RS1_A0 !-48 ADDI
+    # rd_a0 rs1_a0 !-48 addi
     .00050000 .00000500 .000000FD 13000000
-    # $hex_read JAL
+    # $hex_read jal
     $hex_read 6F000000
 :uppercase_alpha
     ; Is it between 'A' and 'F'?
-    # RD_T0 !65 ADDI           ; 'A' character
+    # rd_t0 !65 addi           ; 'A' character
     .80020000 .00001004 13000000
-    # RS1_A0 RS2_T0 @lowercase_alpha BLT
+    # rs1_a0 rs2_t0 @lowercase_alpha blt
     .00000500 .00005000 @lowercase_alpha 63400000
-    # RD_T0 !70 ADDI           ; 'F' character
+    # rd_t0 !70 addi           ; 'F' character
     .80020000 .00006004 13000000
-    # RS1_T0 RS2_A0 @lowercase_alpha BLT
+    # rs1_t0 rs2_a0 @lowercase_alpha blt
     .00800200 .0000A000 @lowercase_alpha 63400000
-    # RD_A0 RS1_A0 !-55 ADDI
+    # rd_a0 rs1_a0 !-55 addi
     .00050000 .00000500 .000090FC 13000000
-    # $hex_read JAL
+    # $hex_read jal
     $hex_read 6F000000
 :lowercase_alpha
     ; Is it between 'a' and 'f'?
-    # RD_T0 !97 ADDI           ; 'a' character
+    # rd_t0 !97 addi           ; 'a' character
     .80020000 .00001006 13000000
-    # RS1_A0 RS2_T0 @next_byte BLT ; Not hex, continue reading
+    # rs1_a0 rs2_t0 @next_byte blt ; Not hex, continue reading
     .00000500 .00005000 @next_byte 63400000
-    # RD_T0 !102 ADDI          ; 'f' character
+    # rd_t0 !102 addi          ; 'f' character
     .80020000 .00006006 13000000
-    # RS1_T0 RS2_A0 @next_byte BLT ; Not hex, continue reading
+    # rs1_t0 rs2_a0 @next_byte blt ; Not hex, continue reading
     .00800200 .0000A000 @next_byte 63400000
-    # RD_A0 RS1_A0 !-87 ADDI
+    # rd_a0 rs1_a0 !-87 addi
     .00050000 .00000500 .000090FA 13000000
 :hex_read
     ; END check hex -- leaves the half byte in a0
 
-    # RS1_S4 @combine BNEZ     ; if toggle != 0 -> combine
+    # rs1_s4 @combine bnez     ; if toggle != 0 -> combine
     .00000A00 @combine 63100000
     ; Toggle == 0, we need to prepare for later
-    # RD_S5 RS1_A0 MV          ; Load hold
+    # rd_s5 rs1_a0 mv          ; Load hold
     .800A0000 .00000500 13000000
 
-    # RD_S4 !1 ADDI              ; Set toggle
+    # rd_s4 !1 addi              ; Set toggle
     .000A0000 .00001000 13000000
-    # $next_byte JAL           ; Read next byte
+    # $next_byte jal           ; Read next byte
     $next_byte 6F000000
 
 :combine
     ; Combine half bytes
-    # RD_A1 RS1_S5 RS2_X4 SLLI ; Shift logical left 4 times
+    # rd_a1 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
     .80050000 .00800A00 .00004000 13100000
-    # RD_A0 RS1_A0 RS2_A1 ADD  ; Combine two half bytes
+    # rd_a0 rs1_a0 rs2_a1 add  ; Combine two half bytes
     .00050000 .00000500 .0000B000 33000000
     ; Leaves the full byte in a0
 
     ; Values are combined, now we write in the file
-    # RS1_SP RS2_A0 SB         ; Store prepared byte in buffer
+    # rs1_sp rs2_a0 sb         ; Store prepared byte in buffer
     .00000100 .0000A000 23000000
-    # RD_A7 !64 ADDI           ; sys_write
+    # rd_a7 !64 addi           ; sys_write
     .80080000 .00000004 13000000
-    # RD_A0 RS1_S3 MV          ; file descriptor (stdout)
+    # rd_a0 rs1_s3 mv          ; file descriptor (stdout)
     .00050000 .00800900 13000000
-    # RD_A1 RS1_SP MV          ; string address
+    # rd_a1 rs1_sp mv          ; string address
     .80050000 .00000100 13000000
-    # ECALL
+    # ecall
     73000000
 
     ; Update globals
-    # RD_S4 MV                 ; Clear toggle
+    # rd_s4 mv                 ; Clear toggle
     .000A0000 13000000
-    # RD_S5 MV                 ; Clear hold
+    # rd_s5 mv                 ; Clear hold
     .800A0000 13000000
 
     ; Read next byte
-    # $next_byte JAL
+    # $next_byte jal
     $next_byte 6F000000
 
 :terminate
     ; Terminate program with 0 return code
-    # RD_A7 !93 ADDI           ; sys_exit
+    # rd_a7 !93 addi           ; sys_exit
     .80080000 .0000D005 13000000
-    # ECALL
+    # ecall
     73000000
 # PROGRAM END
 

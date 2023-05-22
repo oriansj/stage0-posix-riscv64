@@ -34,44 +34,44 @@
 # s1: address to pointer array of program and arguments to be executed
 # s2: have_hex0
 
-    RD_S1 ~argv_hex0 AUIPC            # hex0-seed hex0_riscv64.hex0 hex0
-    RD_S1 RS1_S1 !argv_hex0 ADDI
-    $clone JAL                        # jump to clone
+    rd_s1 ~argv_hex0 auipc            # hex0-seed hex0_riscv64.hex0 hex0
+    rd_s1 rs1_s1 !argv_hex0 addi
+    $clone jal                        # jump to clone
 
 :kaem_minimal
-    RD_S1 ~argv_kaem AUIPC            # hex0 kaem-minimal.hex0 kaem
-    RD_S1 RS1_S1 !argv_kaem ADDI
+    rd_s1 ~argv_kaem auipc            # hex0 kaem-minimal.hex0 kaem
+    rd_s1 rs1_s1 !argv_kaem addi
 
-    RD_S2 RS1_S2 NOT                  # s2 = !s2
+    rd_s2 rs1_s2 not                  # s2 = !s2
 
 :clone
-    RD_A7 !220 ADDI                   # sys_clone
-    RD_A0 !17 ADDI                    # SIGCHLD flag
-    ECALL                             # syscall
+    rd_a7 !220 addi                   # sys_clone
+    rd_a0 !17 addi                    # SIGCHLD flag
+    ecall                             # syscall
 
-    RS1_A0 @parent BNEZ               # if f == 0 it is child
+    rs1_a0 @parent bnez               # if f == 0 it is child
 
     # Deal with child case
 :execve
-    RD_A0 RS1_S1 LD                   # program
+    rd_a0 rs1_s1 ld                   # program
 
-    RD_A7 !221 ADDI                   # sys_execve
-    RD_A1 RS1_S1 MV                   # argv
-    ECALL                             # execve(program, argv)
+    rd_a7 !221 addi                   # sys_execve
+    rd_a1 rs1_s1 mv                   # argv
+    ecall                             # execve(program, argv)
 
     # Terminate child program (only happens on error)
-    RD_A7 !93 ADDI                    # sys_exit
-    ECALL                             # exit(1)
+    rd_a7 !93 addi                    # sys_exit
+    ecall                             # exit(1)
 
 :parent
-    RD_A7 !260 ADDI                   # sys_wait4
-    ECALL                             # syscall
-    RS1_S2 @kaem_minimal BEQZ         # Now build kaem
+    rd_a7 !260 addi                   # sys_wait4
+    ecall                             # syscall
+    rs1_s2 @kaem_minimal beqz         # Now build kaem
 
 :start_kaem
-    RD_S1 ~argv_kaem_minimal AUIPC    # kaem
-    RD_S1 RS1_S1 !argv_kaem_minimal ADDI
-    $execve JAL                       # execve into kaem-minimal
+    rd_s1 ~argv_kaem_minimal auipc    # kaem
+    rd_s1 rs1_s1 !argv_kaem_minimal addi
+    $execve jal                       # execve into kaem-minimal
 
 # PROGRAM END
 

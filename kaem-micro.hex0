@@ -76,50 +76,50 @@ F3 00              ## e_machine Indicating RISC-V
 #:ELF_text
 # :_start ; (0x0600078)
 
-    97 04 00 00     # RD_S1 ~argv_hex0 AUIPC            ; hex0-seed hex0_riscv64.hex0 hex0    
-    93 84 84 05     # RD_S1 RS1_S1 !argv_hex0 ADDI      # +88B
+    97 04 00 00     # rd_s1 ~argv_hex0 auipc            ; hex0-seed hex0_riscv64.hex0 hex0    
+    93 84 84 05     # rd_s1 rs1_s1 !argv_hex0 addi      # +88B
 
-    6F 00 00 01     # $clone JAL                        ; jump to clone
+    6F 00 00 01     # $clone jal                        ; jump to clone
                     # +16B
 
 # :kaem_minimal ; (0x0600084)
-    97 04 00 00     # RD_S1 ~argv_kaem AUIPC            ; hex0 kaem-minimal.hex0 kaem
-    93 84 C4 06     # RD_S1 RS1_S1 !argv_kaem ADDI
+    97 04 00 00     # rd_s1 ~argv_kaem auipc            ; hex0 kaem-minimal.hex0 kaem
+    93 84 C4 06     # rd_s1 rs1_s1 !argv_kaem addi
                     # +108B
 
-    13 49 F9 FF     # RD_S2 RS1_S2 NOT                  ; s2 = !s2
+    13 49 F9 FF     # rd_s2 rs1_s2 not                  ; s2 = !s2
 
 # :clone ; (0x0600090)
-    93 08 C0 0D     # RD_A7 !220 ADDI                   ; sys_clone
-    13 05 10 01     # RD_A0 !17 ADDI                    ; SIGCHLD flag
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 C0 0D     # rd_a7 !220 addi                   ; sys_clone
+    13 05 10 01     # rd_a0 !17 addi                    ; SIGCHLD flag
+    73 00 00 00     # ecall                             ; syscall
 
-    63 1E 05 00     # RS1_A0 @parent BNEZ               ; if f == 0 it is child
+    63 1E 05 00     # rs1_a0 @parent bnez               ; if f == 0 it is child
                     # +28B
 
     # Deal with child case
 # :execve ; (0x06000a0)
-    03 B5 04 00     # RD_A0 RS1_S1 LD                   ; program
+    03 B5 04 00     # rd_a0 rs1_s1 ld                   ; program
 
-    93 08 D0 0D     # RD_A7 !221 ADDI                   ; sys_execve
-    93 85 04 00     # RD_A1 RS1_S1 MV                   ; argv
-    73 00 00 00     # ECALL                             ; execve(program, argv)
+    93 08 D0 0D     # rd_a7 !221 addi                   ; sys_execve
+    93 85 04 00     # rd_a1 rs1_s1 mv                   ; argv
+    73 00 00 00     # ecall                             ; execve(program, argv)
 
     # Terminate child program (only happens on error)
-    93 08 D0 05     # RD_A7 !93 ADDI                    ; sys_exit
-    73 00 00 00     # ECALL                             ; syscall
+    93 08 D0 05     # rd_a7 !93 addi                    ; sys_exit
+    73 00 00 00     # ecall                             ; syscall
 
 # :parent ; (0x06000b8)
-    93 08 40 10     # RD_A7 !260 ADDI                   ; sys_wait4
-    73 00 00 00     # ECALL                             ; syscall
-    E3 02 09 FC     # RS1_S2 @kaem_minimal BEQZ         ; Now build kaem
+    93 08 40 10     # rd_a7 !260 addi                   ; sys_wait4
+    73 00 00 00     # ecall                             ; syscall
+    E3 02 09 FC     # rs1_s2 @kaem_minimal beqz         ; Now build kaem
                     # -60B
 
 # :start_kaem ; (0x06000c4)
-    97 04 00 00     # RD_S1 ~argv_kaem_minimal AUIPC ; kaem
-    93 84 C4 03     # RD_S1 RS1_S1 !argv_kaem_minimal ADDI
+    97 04 00 00     # rd_s1 ~argv_kaem_minimal auipc ; kaem
+    93 84 C4 03     # rd_s1 rs1_s1 !argv_kaem_minimal addi
                     # +60B
-    6F F0 5F FD     # $execve JAL                       ; execve into kaem-minimal
+    6F F0 5F FD     # $execve jal                       ; execve into kaem-minimal
                     # -44B
 
 # PROGRAM END

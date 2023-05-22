@@ -354,7 +354,7 @@ UpdateShiftRegister_DOT:
 
 UpdateShiftRegister_I:
     # Corresponds to RISC-V I format
-    addiw a0, a0, 4              # add 4 due to this being 2nd part of AUIPC combo
+    addiw a0, a0, 4              # add 4 due to this being 2nd part of auipc combo
 
     li t1, 0xfff
     and t1, a0, t1               # (value & 0xfff)
