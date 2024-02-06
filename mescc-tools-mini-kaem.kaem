@@ -121,6 +121,7 @@
 ./riscv64/artifact/M2 --architecture riscv64 \
 	-f ./M2libc/sys/types.h \
 	-f ./M2libc/stddef.h \
+	-f ./M2libc/sys/utsname.h \
 	-f ./M2libc/riscv64/linux/unistd.c \
 	-f ./M2libc/riscv64/linux/fcntl.c \
 	-f ./M2libc/fcntl.c \
@@ -158,6 +159,7 @@
 	-f ./M2libc/sys/types.h \
 	-f ./M2libc/stddef.h \
 	-f ./M2libc/string.c \
+	-f ./M2libc/sys/utsname.h \
 	-f ./M2libc/riscv64/linux/unistd.c \
 	-f ./M2libc/riscv64/linux/fcntl.c \
 	-f ./M2libc/fcntl.c \
@@ -193,6 +195,7 @@
 ./riscv64/artifact/M2 --architecture riscv64 \
 	-f ./M2libc/sys/types.h \
 	-f ./M2libc/stddef.h \
+	-f ./M2libc/sys/utsname.h \
 	-f ./M2libc/riscv64/linux/unistd.c \
 	-f ./M2libc/riscv64/linux/fcntl.c \
 	-f ./M2libc/fcntl.c \
@@ -233,6 +236,7 @@
 	-f ./M2libc/sys/types.h \
 	-f ./M2libc/stddef.h \
 	-f ./M2libc/string.c \
+	-f ./M2libc/sys/utsname.h \
 	-f ./M2libc/riscv64/linux/unistd.c \
 	-f ./M2libc/riscv64/linux/fcntl.c \
 	-f ./M2libc/fcntl.c \
