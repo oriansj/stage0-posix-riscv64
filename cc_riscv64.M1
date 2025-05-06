@@ -1232,6 +1232,22 @@
     rd_a2 rs1_a2 !1 addi              ; next position
     ret
 
+:enum_error_open_curly
+"ERROR in enum
+Expected {
+"
+:enum_error_equal
+"ERROR in enum
+Expected =
+"
+:enum_error_close_curly
+"ERROR in enum
+Expected }
+"
+:enum_error_semi_colon
+"ERROR in enum
+Expected ;
+"
 
 ; program function
 ; receives nothing, returns nothing
@@ -1245,6 +1261,74 @@
     ; The binary initialized the globals to null, so we can skip those steps
 
 :new_type
+    rs1_s4 @program_done beqz         ; Be done if null
+
+    rd_a1 rs1_s4 !16 ld               ; GLOBAL_TOKEN->S
+    rd_a0 ~enum auipc                 ; "enum"
+    rd_a0 rs1_a0 !enum addi
+    rd_ra $match jal                  ; Check if GLOBAL_TOKEN->S == "enum"
+    rs1_a0 @constant_value bnez       ; Looks like not an enum
+
+    ; Deal with minimal anonymous enums
+    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+
+    rd_a0 ~enum_error_open_curly auipc ; Using "ERROR in enum\nExpected {\n"
+    rd_a0 rs1_a0 !enum_error_open_curly addi
+    rd_a1 ~open_curly_brace auipc     ; Using "{"
+    rd_a1 rs1_a1 !open_curly_brace addi
+    rd_ra $require_match jal          ; Require match and skip
+
+:enumerator
+    rd_a0 rs1_s4 !16 ld               ; global_token->S
+    rd_a1 mv                          ; NULL
+    rd_a2 rs1_s5 mv                   ; global_constant_list
+    rd_ra $sym_declare jal            ; Declare that constant
+    rd_s5 rs1_a0 mv                   ; global_constant_list = sym_declare(global_token->s, NULL, global_constant_list);
+
+    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+
+    rd_a0 ~enum_error_equal auipc     ; Using "ERROR in enum\nExpected =\n"
+    rd_a0 rs1_a0 !enum_error_equal addi
+    rd_a1 ~equal auipc                ; Using "="
+    rd_a1 rs1_a1 !equal addi
+    rd_ra $require_match jal          ; Require match and skip
+
+    rs1_s5 rs2_s4 @32 sd              ; global_constant_list->arguments = global_token->next
+
+    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+
+    rd_a1 rs1_s4 !16 ld               ; global_token->S
+    rd_a0 ~comma auipc                ; ","
+    rd_a0 rs1_a0 !comma addi
+    rd_ra $match jal                  ; IF global_token->S == ","
+    rs1_a0 @enum_end bnez             ; No comma means no more enumerators
+
+    ; Skip comma
+    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+
+    ; Check if there are more enumerators or if it was a trailing comma
+    rd_a1 rs1_s4 !16 ld               ; global_token->S
+    rd_a0 ~close_curly_brace auipc    ; "}"
+    rd_a0 rs1_a0 !close_curly_brace addi
+    rd_ra $match jal                  ; IF global_token->S == "}"
+    rs1_a0 @enumerator bnez           ; More enumerators
+
+:enum_end
+    rd_a0 ~enum_error_close_curly auipc ; Using "ERROR in enum\nExpected }\n"
+    rd_a0 rs1_a0 !enum_error_close_curly addi
+    rd_a1 ~close_curly_brace auipc    ; Using "}"
+    rd_a1 rs1_a1 !close_curly_brace addi
+    rd_ra $require_match jal          ; Require match and skip
+
+    rd_a0 ~enum_error_semi_colon auipc ; Using "ERROR in enum\nExpected ;\n"
+    rd_a0 rs1_a0 !enum_error_semi_colon addi
+    rd_a1 ~semicolon auipc            ; Using ";"
+    rd_a1 rs1_a1 !semicolon addi
+    rd_ra $require_match jal          ; Require match and skip
+
+    $new_type jal                     ; go around again
+
+:constant_value
     rs1_s4 @program_done beqz         ; Be done if null
 
     rd_a1 rs1_s4 !16 ld               ; GLOBAL_TOKEN->S
@@ -4843,6 +4927,7 @@
 ;; Keywords
 :union  "union"
 :struct  "struct"
+:enum "enum"
 :constant  "CONSTANT"
 :main_string  "main"
 :argc_string  "argc"
