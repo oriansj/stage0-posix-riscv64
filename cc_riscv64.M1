@@ -289,7 +289,7 @@
     rs1_a0 rs2_t0 @get_token_done bne ; keep if just '/'
 
     ; Deal with // line comment
-    rd_ra $fgetc jal                  ; drop to match
+    rd_ra $purge_macro jal            ; discard all until newline
     rd_s4 rs1_a0 mv                   ; Set C
     $reset jal                        ; throw away, try again
 
@@ -1267,7 +1267,7 @@ Expected ;
     rd_a0 ~enum auipc                 ; "enum"
     rd_a0 rs1_a0 !enum addi
     rd_ra $match jal                  ; Check if GLOBAL_TOKEN->S == "enum"
-    rs1_a0 @constant_value bnez       ; Looks like not an enum
+    rs1_a0 @program_else bnez         ; Looks like not an enum
 
     ; Deal with minimal anonymous enums
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
@@ -1326,29 +1326,6 @@ Expected ;
     rd_a1 rs1_a1 !semicolon addi
     rd_ra $require_match jal          ; Require match and skip
 
-    $new_type jal                     ; go around again
-
-:constant_value
-    rs1_s4 @program_done beqz         ; Be done if null
-
-    rd_a1 rs1_s4 !16 ld               ; GLOBAL_TOKEN->S
-    rd_a0 ~constant auipc             ; "CONSTANT"
-    rd_a0 rs1_a0 !constant addi
-    rd_ra $match jal                  ; Check if GLOBAL_TOKEN->S == "CONSTANT"
-    rs1_a0 @program_else bnez
-
-    ; Deal with minimal constant case
-    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
-    rd_a0 rs1_s4 !16 ld               ; global_token->S
-    rd_a1 mv                          ; NULL
-    rd_a2 rs1_s5 mv                   ; global_constant_list
-    rd_ra $sym_declare jal            ; Declare that constant
-    rd_s5 rs1_a0 mv                   ; global_constant_list = sym_declare(global_token->s, NULL, global_constant_list);
-
-    rd_a1 rs1_s4 ld                   ; global_token->next
-    rs1_s5 rs2_a1 @32 sd              ; global_constant_list->arguments = global_token->next
-
-    rd_s4 rs1_a1 ld                   ; global_token = global_token->next->next
     $new_type jal                     ; go around again
 
 :program_else
@@ -1649,28 +1626,11 @@ Expected ;
     rd_t0 !125 addi                   ; "}"
     rs1_a0 rs2_t0 @create_struct_done beq ; We are done
 
-    ; Looks like we are adding members
-    ; Lets see if it is a union
-    rd_a0 rs1_s4 !16 ld               ; global_token->S
-    rd_a1 ~union auipc                ; Using "union"
-    rd_a1 rs1_a1 !union addi
-    rd_ra $match jal                  ; match(global_token->s, "union")
-    rd_t0 rs1_a0 mv                   ; Protect match result
-
     rd_a0 rs1_a5 mv                   ; put last in right place
     rd_a1 rs1_a6 mv                   ; put offset in right place
-
-    rs1_t0 @create_struct_single bne  ; Deal with singles if no match
-
-    ; Deal with union
-    rd_ra $build_union jal            ; ASSEMBLE
-    $create_struct_common jal
-
-:create_struct_single
-    ; Deal with singles
     rd_ra $build_member jal           ; ASSEMBLE
 :create_struct_common
-    rd_a5 rs1_a0 mv                   ; last = build_union(last, offset)
+    rd_a5 rs1_a0 mv                   ; last = build_member(last, offset)
     rd_a6 rs1_a6 rs2_a4 add           ; offset = offset + member_size
 
     rd_a0 ~create_struct_string_1 auipc ; Using "ERROR in create_struct\n Missing ;\n"
@@ -1819,71 +1779,6 @@ Expected ;
     rd_a2 rs1_sp !16 ld               ; restore a2
     rd_a3 rs1_sp !24 ld               ; restore a3
     rd_sp rs1_sp !32 addi             ; deallocate stack
-    ret
-
-
-; build_union function
-; Receives struct type* last in a0, int offset in a1 and global member_size in a4
-; Updates member_size in a4 and returns struct type* LAST in a0
-; Uses a2 for struct type* last, a3 for int offset, a5 for int size and a4 for int member_size
-:build_union
-    rd_sp rs1_sp !-40 addi            ; allocate stack
-    rs1_sp rs2_ra sd                  ; protect ra
-    rs1_sp rs2_a1 @8 sd               ; protect a1
-    rs1_sp rs2_a2 @16 sd              ; protect a2
-    rs1_sp rs2_a3 @24 sd              ; protect a3
-    rs1_sp rs2_a5 @32 sd              ; protect a5
-
-    rd_a2 rs1_a0 mv                   ; Put LAST in the right spot
-    rd_a3 rs1_a1 mv                   ; Put OFFSET in the right spot
-    rd_a5 mv                          ; SIZE = 0
-
-    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
-
-    rd_a0 ~build_union_string_0 auipc ; Using "ERROR in build_union\nMissing {\n"
-    rd_a0 rs1_a0 !build_union_string_0 addi
-    rd_a1 ~open_curly_brace auipc     ; Using "{"
-    rd_a1 rs1_a1 !open_curly_brace addi
-    rd_ra $require_match jal          ; Make sure we have it
-
-:build_union_iter
-    rd_a0 rs1_s4 !16 ld               ; global_token->S
-    rd_a0 rs1_a0 lbu                  ; global_token->S[0]
-    rd_t0 !125 addi                   ; "}"
-    rs1_a0 rs2_t0 @build_union_done beq ; We are done
-
-    ; Collect union member
-    rd_a0 rs1_a2 mv                   ; Passing LAST
-    rd_a1 rs1_a3 mv                   ; Passing offset
-    rd_ra $build_member jal           ; build_member(last, offset)
-    rd_a2 rs1_a0 mv                   ; last = build_member(last, offset)
-
-    rs1_a4 rs2_a5 @build_union_size blt ; If member_size > size then update size
-
-    ; deal with member_size > size
-    rd_a5 rs1_a4 mv                   ; SIZE = MEMBER_SIZE
-
-:build_union_size
-    rd_a0 ~build_union_string_1 auipc ; Using "ERROR in build_union\nMissing ;\n"
-    rd_a0 rs1_a0 !build_union_string_1 addi
-    rd_a1 ~semicolon auipc     ; Using ";"
-    rd_a1 rs1_a1 !semicolon addi
-    rd_ra $require_match jal          ; Make sure we have it
-    $build_union_iter jal             ; Keep going
-
-:build_union_done
-    rd_a4 rs1_a5 mv                   ; MEMBER_SIZE = SIZE
-
-    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
-
-    rd_a0 rs1_a2 mv                   ; return last
-
-    rd_ra rs1_sp ld                   ; restore ra
-    rd_a1 rs1_sp !8 ld                ; restore a1
-    rd_a2 rs1_sp !16 ld               ; restore a2
-    rd_a3 rs1_sp !24 ld               ; restore a3
-    rd_a5 rs1_sp !32 ld               ; restore a5
-    rd_sp rs1_sp !40 addi             ; deallocate stack
     ret
 
 
@@ -4925,10 +4820,8 @@ Expected ;
 '22 27 00'
 
 ;; Keywords
-:union  "union"
 :struct  "struct"
 :enum "enum"
-:constant  "CONSTANT"
 :main_string  "main"
 :argc_string  "argc"
 :argv_string  "argv"
@@ -5046,16 +4939,6 @@ NULL
 
 :build_member_string_0
 "Struct only supports [num] form
-"
-
-:build_union_string_0
-"ERROR in build_union
-Missing {
-"
-
-:build_union_string_1
-"ERROR in build_union
-Missing ;
 "
 
 :declare_function_string_0
