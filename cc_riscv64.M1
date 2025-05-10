@@ -289,7 +289,7 @@
     rs1_a0 rs2_t0 @get_token_done bne ; keep if just '/'
 
     ; Deal with // line comment
-    rd_ra $fgetc jal                  ; drop to match
+    rd_ra $purge_macro jal            ; discard all until newline
     rd_s4 rs1_a0 mv                   ; Set C
     $reset jal                        ; throw away, try again
 
@@ -1267,7 +1267,7 @@ Expected ;
     rd_a0 ~enum auipc                 ; "enum"
     rd_a0 rs1_a0 !enum addi
     rd_ra $match jal                  ; Check if GLOBAL_TOKEN->S == "enum"
-    rs1_a0 @constant_value bnez       ; Looks like not an enum
+    rs1_a0 @program_else bnez         ; Looks like not an enum
 
     ; Deal with minimal anonymous enums
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
@@ -1326,29 +1326,6 @@ Expected ;
     rd_a1 rs1_a1 !semicolon addi
     rd_ra $require_match jal          ; Require match and skip
 
-    $new_type jal                     ; go around again
-
-:constant_value
-    rs1_s4 @program_done beqz         ; Be done if null
-
-    rd_a1 rs1_s4 !16 ld               ; GLOBAL_TOKEN->S
-    rd_a0 ~constant auipc             ; "CONSTANT"
-    rd_a0 rs1_a0 !constant addi
-    rd_ra $match jal                  ; Check if GLOBAL_TOKEN->S == "CONSTANT"
-    rs1_a0 @program_else bnez
-
-    ; Deal with minimal constant case
-    rd_s4 rs1_s4 ld                   ; global_token = global_token->next
-    rd_a0 rs1_s4 !16 ld               ; global_token->S
-    rd_a1 mv                          ; NULL
-    rd_a2 rs1_s5 mv                   ; global_constant_list
-    rd_ra $sym_declare jal            ; Declare that constant
-    rd_s5 rs1_a0 mv                   ; global_constant_list = sym_declare(global_token->s, NULL, global_constant_list);
-
-    rd_a1 rs1_s4 ld                   ; global_token->next
-    rs1_s5 rs2_a1 @32 sd              ; global_constant_list->arguments = global_token->next
-
-    rd_s4 rs1_a1 ld                   ; global_token = global_token->next->next
     $new_type jal                     ; go around again
 
 :program_else
@@ -4928,7 +4905,6 @@ Expected ;
 :union  "union"
 :struct  "struct"
 :enum "enum"
-:constant  "CONSTANT"
 :main_string  "main"
 :argc_string  "argc"
 :argv_string  "argv"
