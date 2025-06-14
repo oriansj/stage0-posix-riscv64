@@ -3681,16 +3681,12 @@ Expected ;
     rs1_a0 rs2_t0 @primary_expr_bin bne ; Otherwise try '~'
 
     ; Deal with logical not
-    rd_a0 ~primary_expr_string_2 auipc ; Using "rd_a0 !1 addi\n"
-    rd_a0 rs1_a0 !primary_expr_string_2 addi
-    rd_ra $emit_out jal               ; Emit it
-
     rd_a0 ~postfix_expr auipc         ; Using postfix_expr
     rd_a0 rs1_a0 !postfix_expr addi
     rd_ra $common_recursion jal       ; Get what it is notting
 
-    rd_a0 ~primary_expr_string_3 auipc ; Using "rd_a0 rs1_a1 rs2_a0 xor\n"
-    rd_a0 rs1_a0 !primary_expr_string_3 addi
+    rd_a0 ~primary_expr_string_2 auipc ; Using "rd_a0 rs1_a0 !1 sltiu\n"
+    rd_a0 rs1_a0 !primary_expr_string_2 addi
     rd_ra $emit_out jal               ; Emit it
     $primary_expr_done jal            ; We are done
 
@@ -3708,8 +3704,8 @@ Expected ;
     rd_a0 rs1_a0 !postfix_expr addi
     rd_ra $common_recursion jal       ; Get what it is notting
 
-    rd_a0 ~primary_expr_string_4 auipc ; Using "rd_a0 rs1_a0 not\n"
-    rd_a0 rs1_a0 !primary_expr_string_4 addi
+    rd_a0 ~primary_expr_string_3 auipc ; Using "rd_a0 rs1_a0 not\n"
+    rd_a0 rs1_a0 !primary_expr_string_3 addi
     rd_ra $emit_out jal               ; Emit it
     $primary_expr_done jal            ; We are done
 
@@ -3723,8 +3719,8 @@ Expected ;
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
     rd_ra $expression jal             ; Lets recurse
 
-    rd_a0 ~primary_expr_string_5 auipc ; Using Error in Primary expression\nDidn't get )\n"
-    rd_a0 rs1_a0 !primary_expr_string_5 addi
+    rd_a0 ~primary_expr_string_4 auipc ; Using Error in Primary expression\nDidn't get )\n"
+    rd_a0 rs1_a0 !primary_expr_string_4 addi
     rd_a1 ~close_paren auipc          ; Using ")"
     rd_a1 rs1_a1 !close_paren addi
     rd_ra $require_match jal          ; Make sure we have it
@@ -3753,8 +3749,8 @@ Expected ;
 :primary_expr_var
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
-    rd_a1 ~primary_expr_string_6 auipc ; Using "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
-    rd_a1 rs1_a1 !primary_expr_string_6 addi
+    rd_a1 ~primary_expr_string_5 auipc ; Using "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    rd_a1 rs1_a1 !primary_expr_string_5 addi
     rd_ra $In_Set jal                 ; See if we have a match
     rs1_a0 @primary_expr_num beqz     ; otherwise try number
 
@@ -3765,8 +3761,8 @@ Expected ;
 :primary_expr_num
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
-    rd_a1 ~primary_expr_string_7 auipc ; Using "0123456789"
-    rd_a1 rs1_a1 !primary_expr_string_7 addi
+    rd_a1 ~primary_expr_string_6 auipc ; Using "0123456789"
+    rd_a1 rs1_a1 !primary_expr_string_6 addi
     rd_ra $In_Set jal                 ; See if we have a match
     rs1_a0 @primary_expr_fail beqz    ; Otherwise we failed
 
@@ -5247,26 +5243,22 @@ Missing ;
 "
 
 :primary_expr_string_2
-"rd_a0 !1 addi
+"rd_a0 rs1_a0 !1 sltiu
 "
 
 :primary_expr_string_3
-"rd_a0 rs1_a1 rs2_a0 xor
-"
-
-:primary_expr_string_4
 "rd_a0 rs1_a0 not
 "
 
-:primary_expr_string_5
+:primary_expr_string_4
 "Error in Primary expression
 Didn't get )
 "
 
-:primary_expr_string_6
+:primary_expr_string_5
 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 
-:primary_expr_string_7
+:primary_expr_string_6
 "0123456789"
 
 :primary_expr_variable_string_0
