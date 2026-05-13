@@ -469,6 +469,8 @@
     rd_a1 rs1_s5 mv                   ; S[0]
     rs1_a1 rs2_a0 sb                  ; S[0] = C
     rd_a1 rs1_a1 !1 addi              ; S = S + 1
+    rd_a0 addi                        ; NULL terminate S
+    rs1_a1 rs2_a0 sb                  ; S[0] = NULL
     rd_s5 rs1_a1 mv                   ; Update S
     rd_ra $fgetc jal
 
