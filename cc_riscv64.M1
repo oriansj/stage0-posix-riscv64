@@ -200,11 +200,17 @@
     ; Reads chars until LF is read and returns LF
 :purge_macro
     rd_ra $fgetc jal                  ; read next char
+    rd_t0 !-4 addi                    ; Check for EOF
+    rs1_a0 rs2_t0 @purge_macro_eof beq ; Done if EOF
     rd_t0 !10 addi                    ; Check for '\n'
     rs1_a0 rs2_t0 @purge_macro bne    ; Keep going
 
     rd_s4 rs1_a0 mv                   ; Set C
     $reset jal                        ; Try again
+
+:purge_macro_eof
+    rd_s4 rs1_a0 mv                   ; Return EOF instead of the leading #
+    $get_token_abort jal
 
 :get_token_alpha
     rd_a0 rs1_s4 mv                   ; Send C
@@ -261,11 +267,15 @@
     rd_s4 rs1_a0 mv                   ; Set C
 :get_token_comment_block_outer
     rd_a0 rs1_s4 mv                   ; Using C
+    rd_t0 !-4 addi                    ; Check for EOF
+    rs1_a0 rs2_t0 @get_token_abort beq ; Stop if the comment was not closed
     rd_t0 !47 addi                    ; IF '/' != C
     rs1_a0 rs2_t0 @get_token_comment_block_done beq ; Done
 
 :get_token_comment_block_inner
     rd_a0 rs1_s4 mv                   ; Using C
+    rd_t0 !-4 addi                    ; Check for EOF
+    rs1_a0 rs2_t0 @get_token_abort beq ; Stop if the comment was not closed
     rd_t0 !42 addi                    ; If '*' != C
     rs1_a0 rs2_t0 @get_token_comment_block_iter beq ; jump over
 
@@ -443,11 +453,14 @@
 
 :consume_word_iter
     rd_ra $consume_byte jal           ; read next char
+    rd_t0 !-4 addi                    ; Check for EOF
+    rs1_a0 rs2_t0 @consume_word_done beq ; Stop if the string was not closed
 
     rs2_a2 @consume_word_loop bnez    ; keep looping if ESCAPE
 
     rs1_a0 rs2_a1 @consume_word_loop bnez ; keep going if C != FREQ
 
+:consume_word_done
     rd_ra $fgetc jal                  ; return next char
 
     rd_ra rs1_sp ld                   ; restore ra
@@ -1279,6 +1292,7 @@ Expected ;
     rd_ra $require_match jal          ; Require match and skip
 
 :enumerator
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a1 mv                          ; NULL
     rd_a2 rs1_s5 mv                   ; global_constant_list
@@ -1293,9 +1307,11 @@ Expected ;
     rd_a1 rs1_a1 !equal addi
     rd_ra $require_match jal          ; Require match and skip
 
+    rd_ra $require_global_token jal    ; Ensure enum value exists
     rs1_s5 rs2_s4 @32 sd              ; global_constant_list->arguments = global_token->next
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @enum_end beqz             ; Let enum_end report missing }
 
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~comma auipc                ; ","
@@ -1305,6 +1321,7 @@ Expected ;
 
     ; Skip comma
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @enum_end beqz             ; Let enum_end report missing }
 
     ; Check if there are more enumerators or if it was a trailing comma
     rd_a1 rs1_s4 !16 ld               ; global_token->S
@@ -1331,6 +1348,7 @@ Expected ;
 :program_else
     rd_ra $type_name jal              ; Figure out the type_size
     rs1_a0 @new_type beqz             ; new type if NULL == type_size
+    rd_ra $require_global_token jal    ; Missing declarator
 
     ; Add to global symbol table
     rd_a1 rs1_a0 mv                   ; put type_size in the right spot
@@ -1339,6 +1357,7 @@ Expected ;
     rd_ra $sym_declare jal            ; Declare symbol
     rd_s6 rs1_a0 mv                   ; global_symbol_list = sym_declare(global_token->s, type_size, global_symbol_list);
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @program_error beqz        ; Missing ; or function body
 
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~semicolon auipc            ; ";"
@@ -1462,6 +1481,7 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~struct auipc               ; Using "struct"
     rd_a0 rs1_a0 !struct addi
@@ -1515,6 +1535,7 @@ Expected ;
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
 
 :type_name_iter
+    rs1_s4 @type_name_done beqz        ; EOF means no more pointer markers
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
     rd_t0 !42 addi                    ; '*'
@@ -1621,6 +1642,7 @@ Expected ;
     rd_a5 mv                          ; LAST = NULL
 
 :create_struct_iter
+    rd_ra $require_global_token jal    ; Ensure struct member or } exists
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
     rd_t0 !125 addi                   ; "}"
@@ -1737,17 +1759,20 @@ Expected ;
 
     rd_ra $type_name jal              ; Get member_type
     rd_a2 rs1_a0 mv                   ; Put in place
+    rd_ra $require_global_token jal    ; Ensure member name exists
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rs1_a3 rs2_a1 @48 sd              ; I->NAME = global_token->S
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @build_member_non_array beqz ; Missing ; will be reported by caller
 
     ; Check if we have an array
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~open_bracket auipc         ; Using "["
     rd_a0 rs1_a0 !open_bracket addi
     rd_ra $match jal                  ; If global_token->S == "["
-    rs1_a0 $build_member_array beqz   ; Then we have to deal with arrays in our struct
+    rs1_a0 @build_member_array beqz   ; Then we have to deal with arrays in our struct
 
+:build_member_non_array
     ; Deal with non-array case
     rd_a0 rs1_a2 !8 ld                ; member_type->SIZE
     rs1_a3 rs2_a0 @8 sd               ; I->SIZE = member_type->SIZE
@@ -1755,11 +1780,19 @@ Expected ;
 
 :build_member_array
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rd_ra $require_global_token jal    ; Require an array size after [
+    rd_a0 rs1_s4 !16 ld               ; global_token->S
+    rd_a0 rs1_a0 lbu                  ; global_token->S[0]
+    rd_t0 !48 addi                    ; '0'
+    rs1_a0 rs2_t0 @build_member_array_bad_size blt
+    rd_t0 !57 addi                    ; '9'
+    rs1_t0 rs2_a0 @build_member_array_bad_size blt
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_ra $numerate_string jal        ; convert number
     rd_a1 rs1_a2 !40 ld               ; member_type->TYPE
     rd_a1 rs1_a1 !8 ld                ; member_type->TYPE->SIZE
     rd_a0 rs1_a0 rs2_a1 mul           ; member_type->type->size * numerate_string(global_token->s)
+    rs1_a3 rs2_a0 @8 sd               ; I->SIZE = array size in bytes
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
 
@@ -1768,6 +1801,11 @@ Expected ;
     rd_a1 ~close_bracket auipc        ; Using "]"
     rd_a1 rs1_a1 !close_bracket addi
     rd_ra $require_match jal          ; Make sure we have it
+
+    $build_member_done jal
+
+:build_member_array_bad_size
+    $Fail jal                         ; Abort on a non-numeric array size
 
 :build_member_done
     rd_a4 rs1_a3 !8 ld                ; MEMBER_SIZE = I->SIZE
@@ -1792,6 +1830,7 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a2 rs1_a0 mv                   ; put the message somewhere safe
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_ra $match jal                  ; IF required == global_token->S
@@ -1809,6 +1848,15 @@ Expected ;
     rd_a1 rs1_sp !8 ld                ; restore a1
     rd_a2 rs1_sp !16 ld               ; restore a2
     rd_sp rs1_sp !24 addi             ; deallocate stack
+    ret
+
+
+; require_global_token function
+; Aborts if global_token is NULL before callers dereference it
+:require_global_token
+    rs1_s4 @require_global_token_done bnez ; Continue if global_token is present
+    $Fail jal                         ; Abort on EOF
+:require_global_token_done
     ret
 
 
@@ -1883,6 +1931,7 @@ Expected ;
     rd_s8 rs1_a0 mv                   ; global_function_list = function
 
     rd_ra $collect_arguments jal      ; collect all of the function arguments
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
 
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a1 ~semicolon auipc            ; ";"
@@ -1947,6 +1996,7 @@ Expected ;
     rs1_sp rs2_a2 @16 sd              ; protect a2
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
 :collect_arguments_loop
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~close_paren auipc          ; ")"
     rd_a0 rs1_a0 !close_paren addi
@@ -1956,6 +2006,7 @@ Expected ;
     ; deal with the case of there are arguments
     rd_ra $type_name jal              ; Get the type
     rd_a2 rs1_a0 mv                   ; put type_size safely out of the way
+    rd_ra $require_global_token jal    ; Ensure argument token exists
 
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~close_paren auipc          ; ")"
@@ -1996,6 +2047,7 @@ Expected ;
     rs1_s11 rs2_a2 @32 sd             ; function->args = a
 
 :collect_arguments_common
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~comma auipc                ; ","
     rd_a0 rs1_a0 !comma addi
@@ -2025,6 +2077,7 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~open_curly_brace auipc     ; "{"
     rd_a0 rs1_a0 !open_curly_brace addi
@@ -2132,6 +2185,7 @@ Expected ;
     rd_ra $emit_out jal               ; emit it
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rd_ra $require_global_token jal    ; Require a label after goto
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_ra $emit_out jal               ; emit it
 
@@ -2220,6 +2274,7 @@ Expected ;
     rd_a2 rs1_s11 !8 ld               ; frame = function->locals
 
 :recursive_statement_loop
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~close_curly_brace auipc    ; "}"
     rd_a0 rs1_a0 !close_curly_brace addi
@@ -2272,9 +2327,11 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_ra $type_name jal              ; Get the local's type
 
     rd_a1 rs1_a0 mv                   ; Put struct type* type_size in the right place
+    rd_ra $require_global_token jal    ; Missing local name
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a2 rs1_s11 !8 ld               ; function->locals
     rd_ra $sym_declare jal            ; Declare it
@@ -2342,6 +2399,7 @@ Expected ;
     rd_ra $emit_out jal               ; emit it
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @collect_local_done beqz   ; Missing ; will be reported below
 
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc                ; Using "="
@@ -2449,6 +2507,9 @@ Expected ;
     rd_a1 rs1_a2 mv                   ; Passing NUMBER_STRING
     rd_ra $uniqueID_out jal           ; uniqueID_out(function->s, number_string)
 
+    rs1_s4 @process_if_has_token bnez ; EOF means no else to process
+    $process_if_done jal
+:process_if_has_token
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~else_string auipc          ; Using "else"
     rd_a0 rs1_a0 !else_string addi
@@ -2668,6 +2729,7 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_ra $save_break_frame jal       ; Save the frame
     rd_a0 rs1_s10 mv                  ; Get current_count
     rd_s10 rs1_s10 !1 addi            ; current_count = current_count + 1
@@ -2695,6 +2757,7 @@ Expected ;
     rd_a1 rs1_a1 !open_paren addi
     rd_ra $require_match jal          ; Make sure we have it
 
+    rd_ra $require_global_token jal    ; Ensure for body is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~semicolon auipc            ; Using ";"
     rd_a0 rs1_a0 !semicolon addi
@@ -2819,6 +2882,7 @@ Expected ;
     rd_ra $require_match jal          ; Make sure we have it
 
 :process_asm_iter
+    rs1_s4 @process_asm_done beqz      ; Missing ) will be reported below
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
     rd_t0 !34 addi                    ; IF global_token->S[0] == '"'
@@ -2866,6 +2930,7 @@ Expected ;
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @return_result_cleanup beqz ; Missing ; will be reported below
 
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
@@ -2875,6 +2940,7 @@ Expected ;
     rd_ra $expression jal             ; get the expression we are returning
 
 :return_result_cleanup
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a0 ~return_result_string_0 auipc ; Using "ERROR in return_result\nMISSING ;\n"
     rd_a0 rs1_a0 !return_result_string_0 addi
     rd_a1 ~semicolon auipc            ; Using ";"
@@ -2999,8 +3065,10 @@ Expected ;
     rs1_sp rs2_a1 @8 sd               ; protect a1
     rs1_sp rs2_a2 @16 sd              ; protect a2
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_ra $bitwise_expr jal           ; Collect bitwise expressions
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc                ; "="
     rd_a0 rs1_a0 !equal addi
@@ -3369,6 +3437,7 @@ Expected ;
     rs1_sp rs2_ra sd                  ; protect ra
     rs1_sp rs2_a1 @8 sd               ; protect a1
 
+    rs1_s4 @postfix_expr_stub_done beqz ; EOF means no postfix operator
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~open_bracket auipc         ; Using "["
     rd_a0 rs1_a0 !open_bracket addi
@@ -3510,6 +3579,7 @@ Expected ;
     rd_a1 rs1_a1 !close_bracket addi
     rd_ra $require_match jal          ; Make sure we have it
 
+    rs1_s4 @postfix_expr_array_done beqz ; EOF means not an assignment
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc                ; Using "="
     rd_a0 rs1_a0 !equal addi
@@ -3582,10 +3652,14 @@ Expected ;
     rd_ra $emit_out jal               ; Emit it
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rd_ra $require_global_token jal    ; Abort on missing member name
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~current_target auipc       ; Using current_target
     rd_a0 rs1_a0 !current_target addi
     rd_a0 rs1_a0 ld                   ; current_target
+    rs1_a0 @postfix_expr_arrow_has_target bnez ; Require a struct pointer target
+    $Fail jal
+:postfix_expr_arrow_has_target
     rd_ra $lookup_member jal          ; lookup_member(current_target, global_token->s)
     rd_a1 rs1_a0 mv                   ; struct type* I = lookup_member(current_target, global_token->s)
 
@@ -3595,6 +3669,7 @@ Expected ;
     rs1_t0 rs2_a0 sd                  ; current_target = I->TYPE
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rs1_s4 @postfix_expr_arrow_done beqz ; EOF means not an assignment
 
     rd_a0 rs1_a1 !16 ld               ; I->OFFSET
     rs1_a0 @postfix_expr_arrow_first beqz ; IF 0 != I->OFFSET then we don't need to do an offset
@@ -3618,6 +3693,7 @@ Expected ;
     rs1_a0 rs2_t0 @postfix_expr_arrow_done blt ; Check IF I->SIZE >= 4, otherwise be done
 
     ; Last chance for load
+    rs1_s4 @postfix_expr_arrow_done beqz ; EOF means not an assignment
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc                ; Using "="
     rd_a0 rs1_a0 !equal addi
@@ -3644,6 +3720,7 @@ Expected ;
     rs1_sp rs2_ra sd                  ; protect ra
     rs1_sp rs2_a1 @8 sd               ; protect a1
 
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~sizeof_string auipc        ; Using postfix_expr
     rd_a0 rs1_a0 !sizeof_string addi
@@ -3903,6 +3980,7 @@ Expected ;
     rd_a1 rs1_a1 !open_paren addi
     rd_ra $require_match jal          ; Make sure we have it
 
+    rd_ra $require_global_token jal    ; Ensure argument list is present
     rd_a0 ~function_call_string_1 auipc ; Using "rd_sp rs1_sp !-24 addi\nrs1_sp rs2_ra @8 sd\t# Protect the old return pointer\n"
     rd_a0 rs1_a0 !function_call_string_1 addi
     rd_ra $emit_out jal               ; Emit it
@@ -3936,12 +4014,14 @@ Expected ;
     rd_a4 !1 addi                     ; PASSED = 1
 
 :function_call_gen_iter
+    rd_ra $require_global_token jal    ; Ensure global_token is not EOF
     rd_a0 rs1_s4 !16 ld               ; global_token->S
     rd_a0 rs1_a0 lbu                  ; global_token->S[0]
     rd_t0 !44 addi                    ; ","
     rs1_a0 rs2_t0 @function_call_gen_done bne ; Check IF global_token->S[0] == ","
 
     rd_s4 rs1_s4 ld                   ; global_token = global_token->next
+    rd_ra $require_global_token jal    ; Ensure argument follows comma
 
     rd_ra $expression jal             ; Collect the argument
 
@@ -4040,7 +4120,7 @@ Expected ;
 ; variable_load function
 ; Receives struct token_list* A in a0
 ; Returns nothing
-; Updates output and current_target
+    ; Updates output and current_target
 ; Uses a2 for A
 :variable_load
     rd_sp rs1_sp !-24 addi            ; allocate stack
@@ -4050,6 +4130,7 @@ Expected ;
 
     rd_a2 rs1_a0 mv                   ; Protect A
 
+    rs1_s4 @variable_load_regular beqz ; EOF means not a function call
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~open_paren auipc           ; "("
     rd_a0 rs1_a0 !open_paren addi
@@ -4090,6 +4171,7 @@ Expected ;
     rd_ra $emit_out jal               ; Emit it
 
     ; Check for special case of assignment
+    rs1_s4 @variable_load_done beqz    ; EOF means not an assignment
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc                ; Using "="
     rd_a0 rs1_a0 !equal addi
@@ -4121,6 +4203,7 @@ Expected ;
 
     rd_a0 rs1_a0 !16 ld               ; A->S
     rd_a2 rs1_a0 mv                   ; Protect A->S
+    rs1_s4 @function_load_regular beqz ; EOF means address load
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~open_paren auipc           ; Using "("
     rd_a0 rs1_a0 !open_paren addi
@@ -4195,6 +4278,7 @@ Expected ;
     rd_a0 rs1_a0 !global_load_string_2 addi
     rd_ra $emit_out jal               ; Emit it
 
+    rs1_s4 @global_load_done beqz      ; EOF means not an assignment
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_a0 ~equal auipc ; "="
     rd_a0 rs1_a0 !equal addi
@@ -4505,6 +4589,7 @@ Expected ;
     rd_a0 rs1_a2 mv                   ; Put name in the right place
     rd_a2 rs1_a1 mv                   ; Protect S
 
+    rs1_s4 @general_recursion_done beqz ; EOF means no matching operator
     rd_a1 rs1_s4 !16 ld               ; global_token->S
     rd_ra $match jal                  ; IF match(name, global_token->s)
     rs1_a0 @general_recursion_done bnez ; do recursion, else skip it
