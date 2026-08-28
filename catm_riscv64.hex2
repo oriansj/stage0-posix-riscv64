@@ -124,6 +124,8 @@ F3 00              ## e_machine Indicating RISC-V
     .00060000 13000000
     # ecall                             ; syscall
     73000000
+    # rs1_a0 @fail blt                   ; branch if the open failed
+    .00000500 @fail 63400000
     # rd_s3 rs1_a0 addi                 ; protect input fd
     .80090000 .00000500 13000000
 
@@ -138,6 +140,8 @@ F3 00              ## e_machine Indicating RISC-V
     .00060000 .00001000 37000000
     # ecall                             ; syscall
     73000000
+    # rs1_a0 @fail blt                   ; branch if the read failed
+    .00000500 @fail 63400000
     # rd_s4 rs1_a0 addi                 ; actual number of bytes read
     .000A0000 .00000500 13000000
 
@@ -158,6 +162,15 @@ F3 00              ## e_machine Indicating RISC-V
     .00000A00 .0000C000 @keep 63000000
     # $core jal                         ; otherwise move to next file
     $core 6F000000
+
+:fail
+    # An input file could not be read
+    # rd_a7 !93 addi                     ; sys_exit
+    .80080000 .0000D005 13000000
+    # rd_a0 !1 addi                      ; Return code 1
+    .00050000 .00001000 13000000
+    # ecall                              ; exit(1)
+    73000000
 
 :Done
     # Terminate program with 0 return code

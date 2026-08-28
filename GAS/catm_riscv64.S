@@ -53,6 +53,7 @@ core:
     li a0, -100                       # AT_FDCWD
     li a2, 0                          # read only
     ecall                             # syscall
+    bltz a0, fail                     # Check if the open failed
     mv s3, a0                         # protect input fd
 
 keep:
@@ -61,6 +62,7 @@ keep:
     mv a1, s2                         # read into buffer
     li a2, 0x100000                   # read 1MiB
     ecall                             # syscall
+    bltz a0, fail                     # Check if the read failed
     mv s4, a0                         # actual number of bytes read
 
     li a7, 64                         # sys_write
@@ -72,6 +74,12 @@ keep:
     li a2, 0x100000                   # 1MiB
     beq s4, a2, keep                  # keep looping if buffer was full
     j core                            # otherwise move to next file
+
+fail:
+    # An input file could not be read
+    li a7, 93                         # sys_exit
+    li a0, 1                          # Return code 1
+    ecall                             # exit(1)
 
 Done:
     # Terminate program with 0 return code
