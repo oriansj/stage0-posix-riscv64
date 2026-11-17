@@ -66,8 +66,7 @@
     rd_t0 !0x23 addi
     rs1_a0 rs2_t0 @loop beq  ; a0 eq to '#'
     rd_t0 !0x3B addi
-    rs1_a0 rs2_t0 @loop beq  ; a0 eq to ';'
-    $not_comment jal
+    rs1_a0 rs2_t0 @not_comment bne
 :loop
         rd_a0 rs1_s2 mv              ; File descriptor
         ecall                        ; sys_read
@@ -84,57 +83,37 @@
     $loop jal
 
 :not_comment
-    ; Check if it's a hex character:
-    ; in the case it's not, ignores and reads next byte
-    rd_a0 rs1_sp lb
-
-    ; Is it between '0' and '9'?
-    rd_t0 !48 addi           ; '0' character
-    rs1_a0 rs2_t0 @uppercase_alpha blt
-    rd_t0 !57 addi           ; '9' character
-    rs1_t0 rs2_a0 @uppercase_alpha blt
-    rd_a0 rs1_a0 !-48 addi
-    $hex_read jal
-:uppercase_alpha
-    ; Is it between 'A' and 'F'?
-    rd_t0 !65 addi           ; 'A' character
-    rs1_a0 rs2_t0 @lowercase_alpha blt
-    rd_t0 !70 addi           ; 'F' character
-    rs1_t0 rs2_a0 @lowercase_alpha blt
-    rd_a0 rs1_a0 !-55 addi
-    $hex_read jal
-:lowercase_alpha
-    ; Is it between 'a' and 'f'?
-    rd_t0 !97 addi           ; 'a' character
-    rs1_a0 rs2_t0 @next_byte blt ; Not hex, continue reading
-    rd_t0 !102 addi          ; 'f' character
-    rs1_t0 rs2_a0 @next_byte blt ; Not hex, continue reading
-    rd_a0 rs1_a0 !-87 addi
+    rd_t0 rs1_a0 !-48 addi   ; Subtract ASCII '0'
+    rd_t1 !10 addi
+    rs1_t0 rs2_t1 @hex_read bltu ; Unsigned range 0 through 9
+    rd_t0 rs1_a0 !32 ori     ; Fold upper case to lower case
+    rd_t0 rs1_t0 !-97 addi
+    rd_t1 !6 addi
+    rs1_t0 rs2_t1 @next_byte bgeu ; Not hex, continue reading
+    rd_t0 rs1_t0 !10 addi
 :hex_read
-    ; END check hex -- leaves the half byte in a0
+    ; END check hex -- leaves the half byte in t0
 
     rs1_s4 @combine bnez     ; if toggle != 0 -> combine
     ; Toggle == 0, we need to prepare for later
-    rd_s5 rs1_a0 mv          ; Load hold
+    rd_s5 rs1_t0 mv          ; Load hold
     rd_s4 !1 addi            ; Set toggle
     $next_byte jal           ; Read next byte
 
 :combine
     ; Combine half bytes
-    rd_a1 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
-    rd_a0 rs1_a0 rs2_a1 add  ; Combine two half bytes
+    rd_s5 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
+    rd_a0 rs1_t0 rs2_s5 add  ; Combine two half bytes
     ; Leaves the full byte in a0
 
     ; Values are combined, now we write in the file
     rs1_sp rs2_a0 sb         ; Store prepared byte in buffer
     rd_a7 !64 addi           ; sys_write
     rd_a0 rs1_s3 mv          ; file descriptor (stdout)
-    rd_a1 rs1_sp mv          ; string address
     ecall
 
     ; Update globals
     rd_s4 mv                 ; Clear toggle
-    rd_s5 mv                 ; Clear hold
 
     ; Read next byte
     $next_byte jal

@@ -68,8 +68,7 @@ next_byte:
     li t0, 0x23
     beq a0, t0, loop             # a0 eq to '#'
     li t0, 0x3B
-    beq a0, t0, loop             # a0 eq to ';'
-    j not_comment
+    bne a0, t0, not_comment
     loop:
         mv a0, s2             # File descriptor
         ecall                 # sys_read
@@ -86,57 +85,37 @@ next_byte:
     j loop
 
 not_comment:
-    # Check if it's a hex character:
-    # in the case it's not, ignores and reads next byte
-    lb a0, (sp)
-
-    # Is it between '0' and '9'?
-    li t0, 48  # '0' character
-    blt a0, t0, 1f
-    li t0, 57  # '9' character
-    bgt a0, t0, 1f
-    addi a0, a0, -48
-    j hex_read
-1:
-    # Is it between 'A' and 'F'?
-    li t0, 65  # 'A' character
-    blt a0, t0, 1f
-    li t0, 70  # 'F' character
-    bgt a0, t0, 1f
-    addi a0, a0, -55
-    j hex_read
-1:
-    # Is it between 'a' and 'f'?
-    li t0, 97  # 'a' character
-    blt a0, t0, next_byte           # Not hex, continue reading
-    li t0, 102 # 'f' character
-    bgt a0, t0, next_byte           # Not hex, continue reading
-    addi a0, a0, -87
+    addi t0, a0, -48      # Subtract ASCII '0'
+    li t1, 10
+    bltu t0, t1, hex_read # Unsigned range 0 through 9
+    ori t0, a0, 32        # Fold upper case to lower case
+    addi t0, t0, -97
+    li t1, 6
+    bgeu t0, t1, next_byte # Not hex, continue reading
+    addi t0, t0, 10
 hex_read:
-    # END check hex -- leaves the half byte in a0
+    # END check hex -- leaves the half byte in t0
 
     bnez s4, combine    # if toggle != 0 -> combine
     # Toggle == 0, we need to prepare for later
-    mv s5, a0           # Load hold
+    mv s5, t0           # Load hold
     li s4, 1            # Set toggle
     j next_byte         # Read next byte
 
 combine:
     # Combine half bytes
-    slli a1, s5, 4      # Shift logical left 4 times
-    add  a0, a0, a1     # Combine two half bytes
+    slli s5, s5, 4      # Shift logical left 4 times
+    add  a0, t0, s5     # Combine two half bytes
     # Leaves the full byte in a0
 
     # Values are combined, now we write in the file
     sb a0, 0(sp)          # Store prepared byte in buffer
     li a7, 64             # sys_write
     mv a0, s3             # file descriptor (stdout)
-    mv a1, sp             # string address
     ecall
 
     # Update globals
     li s4, 0              # Clear toggle
-    li s5, 0              # Clear hold
 
     # Read next byte
     j next_byte

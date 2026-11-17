@@ -135,98 +135,68 @@ F3 00              ## e_machine Indicating RISC-V
     .00000500 .00005000 @loop 63000000
     # rd_t0 !0x3B addi
     .80020000 .0000B003 13000000
-    # rs1_a0 rs2_t0 @loop beq  ; a0 eq to ';'
-    .00000500 .00005000 @loop 63000000
-    # $not_comment jal
-    $not_comment 6F000000
+    # rs1_a0 rs2_t0 @not_comment bne
+    .00000500 .00005000 @not_comment 63100000
 :loop
-        # rd_a0 rs1_s2 mv              ; File descriptor
-        .00050000 .00000900 13000000
-        # ecall                        ; sys_read
-        73000000
+    # rd_a0 rs1_s2 mv              ; File descriptor
+    .00050000 .00000900 13000000
+    # ecall                        ; sys_read
+    73000000
 
         ; If the file ended (0 bytes read) terminate
-        # rs1_a0 @terminate beqz
-        .00000500 @terminate 63000000
+    # rs1_a0 @terminate beqz
+    .00000500 @terminate 63000000
         ; Check if read byte is the end of the comment (i.e. a newline character),
         ; in that case we continue processing
-        # rd_a0 rs1_sp lb
-        .00050000 .00000100 03000000
-        # rd_t0 !0xA addi
-        .80020000 .0000A000 13000000
-        # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \n
-        .00000500 .00005000 @next_byte 63000000
-        # rd_t0 !0xD addi
-        .80020000 .0000D000 13000000
-        # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \r
-        .00000500 .00005000 @next_byte 63000000
-    # $loop jal
-    $loop 6F000000
-:not_comment
-    ; Check if it's a hex character:
-    ; in the case it's not, ignores and reads next byte
     # rd_a0 rs1_sp lb
     .00050000 .00000100 03000000
+    # rd_t0 !0xA addi
+    .80020000 .0000A000 13000000
+    # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \n
+    .00000500 .00005000 @next_byte 63000000
+    # rd_t0 !0xD addi
+    .80020000 .0000D000 13000000
+    # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \r
+    .00000500 .00005000 @next_byte 63000000
+    # $loop jal
+    $loop 6F000000
 
-    ; Is it between '0' and '9'?
-    # rd_t0 !48 addi           ; '0' character
-    .80020000 .00000003 13000000
-    # rs1_a0 rs2_t0 @uppercase_alpha blt
-    .00000500 .00005000 @uppercase_alpha 63400000
-    # rd_t0 !57 addi           ; '9' character
-    .80020000 .00009003 13000000
-    # rs1_t0 rs2_a0 @uppercase_alpha blt
-    .00800200 .0000A000 @uppercase_alpha 63400000
-    # rd_a0 rs1_a0 !-48 addi
-    .00050000 .00000500 .000000FD 13000000
-    # $hex_read jal
-    $hex_read 6F000000
-:uppercase_alpha
-    ; Is it between 'A' and 'F'?
-    # rd_t0 !65 addi           ; 'A' character
-    .80020000 .00001004 13000000
-    # rs1_a0 rs2_t0 @lowercase_alpha blt
-    .00000500 .00005000 @lowercase_alpha 63400000
-    # rd_t0 !70 addi           ; 'F' character
-    .80020000 .00006004 13000000
-    # rs1_t0 rs2_a0 @lowercase_alpha blt
-    .00800200 .0000A000 @lowercase_alpha 63400000
-    # rd_a0 rs1_a0 !-55 addi
-    .00050000 .00000500 .000090FC 13000000
-    # $hex_read jal
-    $hex_read 6F000000
-:lowercase_alpha
-    ; Is it between 'a' and 'f'?
-    # rd_t0 !97 addi           ; 'a' character
-    .80020000 .00001006 13000000
-    # rs1_a0 rs2_t0 @next_byte blt ; Not hex, continue reading
-    .00000500 .00005000 @next_byte 63400000
-    # rd_t0 !102 addi          ; 'f' character
-    .80020000 .00006006 13000000
-    # rs1_t0 rs2_a0 @next_byte blt ; Not hex, continue reading
-    .00800200 .0000A000 @next_byte 63400000
-    # rd_a0 rs1_a0 !-87 addi
-    .00050000 .00000500 .000090FA 13000000
+:not_comment
+    # rd_t0 rs1_a0 !-48 addi   ; Subtract ASCII '0'
+    .80020000 .00000500 .000000FD 13000000
+    # rd_t1 !10 addi
+    .00030000 .0000A000 13000000
+    # rs1_t0 rs2_t1 @hex_read bltu ; Unsigned range 0 through 9
+    .00800200 .00006000 @hex_read 63600000
+    # rd_t0 rs1_a0 !32 ori     ; Fold upper case to lower case
+    .80020000 .00000500 .00000002 13600000
+    # rd_t0 rs1_t0 !-97 addi
+    .80020000 .00800200 .0000F0F9 13000000
+    # rd_t1 !6 addi
+    .00030000 .00006000 13000000
+    # rs1_t0 rs2_t1 @next_byte bgeu ; Not hex, continue reading
+    .00800200 .00006000 @next_byte 63700000
+    # rd_t0 rs1_t0 !10 addi
+    .80020000 .00800200 .0000A000 13000000
 :hex_read
-    ; END check hex -- leaves the half byte in a0
+    ; END check hex -- leaves the half byte in t0
 
     # rs1_s4 @combine bnez     ; if toggle != 0 -> combine
     .00000A00 @combine 63100000
     ; Toggle == 0, we need to prepare for later
-    # rd_s5 rs1_a0 mv          ; Load hold
-    .800A0000 .00000500 13000000
-
-    # rd_s4 !1 addi              ; Set toggle
+    # rd_s5 rs1_t0 mv          ; Load hold
+    .800A0000 .00800200 13000000
+    # rd_s4 !1 addi            ; Set toggle
     .000A0000 .00001000 13000000
     # $next_byte jal           ; Read next byte
     $next_byte 6F000000
 
 :combine
     ; Combine half bytes
-    # rd_a1 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
-    .80050000 .00800A00 .00004000 13100000
-    # rd_a0 rs1_a0 rs2_a1 add  ; Combine two half bytes
-    .00050000 .00000500 .0000B000 33000000
+    # rd_s5 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
+    .800A0000 .00800A00 .00004000 13100000
+    # rd_a0 rs1_t0 rs2_s5 add  ; Combine two half bytes
+    .00050000 .00800200 .00005001 33000000
     ; Leaves the full byte in a0
 
     ; Values are combined, now we write in the file
@@ -236,16 +206,12 @@ F3 00              ## e_machine Indicating RISC-V
     .80080000 .00000004 13000000
     # rd_a0 rs1_s3 mv          ; file descriptor (stdout)
     .00050000 .00800900 13000000
-    # rd_a1 rs1_sp mv          ; string address
-    .80050000 .00000100 13000000
     # ecall
     73000000
 
     ; Update globals
     # rd_s4 mv                 ; Clear toggle
     .000A0000 13000000
-    # rd_s5 mv                 ; Clear hold
-    .800A0000 13000000
 
     ; Read next byte
     # $next_byte jal
