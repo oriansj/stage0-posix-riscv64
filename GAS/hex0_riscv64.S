@@ -21,15 +21,13 @@
 # Register use:
 # s2: input fd
 # s3: output fd
-# s4: toggle
-# s5: hold
+# s4: pending high nibble or -1
 
 # Uses top of the stack as i/o buffer
 
 .text
 .global _start
 _start:
-    li s4, 0              # Initialize to 0
     ld a1, 16(sp)         # Input file name
 
     # Open input file and store FD in s2
@@ -53,75 +51,58 @@ _start:
     ecall
     mv s3, a0             # Save fd in s3 for later
 
-next_byte:
-    li a7, 63             # sys_read
-    mv a0, s2             # File descriptor
-    mv a1, sp             # Buffer
-    li a2, 1              # Size of what we want to read (set for all subsequent syscalls)
-    ecall
+    mv a1, sp
+    li a2, 1
 
-    # If the file ended (0 bytes read) terminate
-    beqz a0, terminate
+pair:
+    li s4, -1             # No high nibble yet
 
-    # Check if it's a comment
-    lb a0, (sp)
-    li t0, 0x23
-    beq a0, t0, loop             # a0 eq to '#'
-    li t0, 0x3B
-    bne a0, t0, not_comment
-    loop:
-        mv a0, s2             # File descriptor
-        ecall                 # sys_read
+normal:
+    jal t2, read          # Save the return address in t2
+    li t0, 35             # Check for '#'
+    beq a0, t0, comment
+    li t0, 59             # Check for ';'
+    bne a0, t0, decode
 
-        # If the file ended (0 bytes read) terminate
-        beqz a0, terminate
-        # Check if read byte is the end of the comment (i.e. a newline character),
-        # in that case we continue processing
-        lb a0, (sp)
-        li t0, 0xA
-        beq a0, t0, next_byte      # a0 eq to \n
-        li t0, 0xD
-        beq a0, t0, next_byte      # a0 eq to \r
-    j loop
+comment:
+    jal t2, read
+    li t0, 10
+    beq a0, t0, normal    # a0 eq to \n
+    li t0, 13
+    bne a0, t0, comment   # CR also ends the comment
+    j normal
 
-not_comment:
+decode:
     addi t0, a0, -48      # Subtract ASCII '0'
-    li t1, 10
-    bltu t0, t1, hex_read # Unsigned range 0 through 9
+    sltiu t1, t0, 10      # Unsigned range 0 through 9
+    bnez t1, digit
     ori t0, a0, 32        # Fold upper case to lower case
     addi t0, t0, -97
-    li t1, 6
-    bgeu t0, t1, next_byte # Not hex, continue reading
+    sltiu t1, t0, 6
+    beqz t1, normal       # Not hex, continue reading
     addi t0, t0, 10
-hex_read:
-    # END check hex -- leaves the half byte in t0
 
-    bnez s4, combine    # if toggle != 0 -> combine
-    # Toggle == 0, we need to prepare for later
-    mv s5, t0           # Load hold
-    li s4, 1            # Set toggle
-    j next_byte         # Read next byte
-
-combine:
-    # Combine half bytes
-    slli s5, s5, 4      # Shift logical left 4 times
-    add  a0, t0, s5     # Combine two half bytes
-    # Leaves the full byte in a0
-
-    # Values are combined, now we write in the file
-    sb a0, 0(sp)          # Store prepared byte in buffer
+digit:
+    bltz s4, first        # Negative means this is the first digit
+    or t0, t0, s4         # Combine two half bytes
+    sb t0, 0(sp)          # Store prepared byte in buffer
+    mv a0, s3
     li a7, 64             # sys_write
-    mv a0, s3             # file descriptor (stdout)
     ecall
+    j pair
 
-    # Update globals
-    li s4, 0              # Clear toggle
+first:
+    slli s4, t0, 4        # Shift logical left 4 times
+    j normal
 
-    # Read next byte
-    j next_byte
+read:
+    mv a0, s2
+    li a7, 63             # sys_read
+    ecall
+    beqz a0, exit         # If the file ended (0 bytes read) terminate
+    lb a0, 0(sp)
+    jr t2                 # Return to the caller
 
-terminate:
-    # Terminate program with 0 return code
+exit:
     li a7, 93             # sys_exit
     ecall
-# PROGRAM END

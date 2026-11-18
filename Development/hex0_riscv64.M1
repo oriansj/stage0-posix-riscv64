@@ -21,13 +21,11 @@
 ; Register use:
 ; s2: input fd
 ; s3: output fd
-; s4: toggle
-; s5: hold
+; s4: pending high nibble or -1
 
 ; Uses top of the stack as i/o buffer
 
 :_start
-    rd_s4 mv                 ; Initialize register
     rd_a1 rs1_sp !16 ld      ; Input file name
 
     ; Open input file and store FD in s2
@@ -51,77 +49,60 @@
     ecall
     rd_s3 rs1_a0 mv          ; Save fd in s3 for later
 
-:next_byte
-    rd_a7 !63 addi           ; sys_read
-    rd_a0 rs1_s2 mv          ; File descriptor
-    rd_a1 rs1_sp mv          ; Buffer
-    rd_a2 !1 addi            ; Size of what we want to read (set for all subsequent syscalls)
-    ecall
+    rd_a1 rs1_sp mv
+    rd_a2 !1 addi
 
-    ; If the file ended (0 bytes read) terminate
-    rs1_a0 @terminate beqz
+:pair
+    rd_s4 !-1 addi           ; No high nibble yet
 
-    ; Check if it's a comment
-    rd_a0 rs1_sp lb
-    rd_t0 !0x23 addi
-    rs1_a0 rs2_t0 @loop beq  ; a0 eq to '#'
-    rd_t0 !0x3B addi
-    rs1_a0 rs2_t0 @not_comment bne
-:loop
-        rd_a0 rs1_s2 mv              ; File descriptor
-        ecall                        ; sys_read
+:normal
+    rd_t2 $read jal          ; Save the return address in t2
+    rd_t0 !35 addi           ; Check for '#'
+    rs1_a0 rs2_t0 @comment beq
+    rd_t0 !59 addi           ; Check for ';'
+    rs1_a0 rs2_t0 @decode bne
 
-        ; If the file ended (0 bytes read) terminate
-        rs1_a0 @terminate beqz
-        ; Check if read byte is the end of the comment (i.e. a newline character),
-        ; in that case we continue processing
-        rd_a0 rs1_sp lb
-        rd_t0 !0xA addi
-        rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \n
-        rd_t0 !0xD addi
-        rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \r
-    $loop jal
+:comment
+    rd_t2 $read jal
+    rd_t0 !10 addi
+    rs1_a0 rs2_t0 @normal beq ; a0 eq to \n
+    rd_t0 !13 addi
+    rs1_a0 rs2_t0 @comment bne ; CR also ends the comment
+    $normal jal
 
-:not_comment
+:decode
     rd_t0 rs1_a0 !-48 addi   ; Subtract ASCII '0'
-    rd_t1 !10 addi
-    rs1_t0 rs2_t1 @hex_read bltu ; Unsigned range 0 through 9
+    rd_t1 rs1_t0 !10 sltiu   ; Unsigned range 0 through 9
+    rs1_t1 @digit bnez
     rd_t0 rs1_a0 !32 ori     ; Fold upper case to lower case
     rd_t0 rs1_t0 !-97 addi
-    rd_t1 !6 addi
-    rs1_t0 rs2_t1 @next_byte bgeu ; Not hex, continue reading
+    rd_t1 rs1_t0 !6 sltiu
+    rs1_t1 @normal beqz      ; Not hex, continue reading
     rd_t0 rs1_t0 !10 addi
-:hex_read
-    ; END check hex -- leaves the half byte in t0
 
-    rs1_s4 @combine bnez     ; if toggle != 0 -> combine
-    ; Toggle == 0, we need to prepare for later
-    rd_s5 rs1_t0 mv          ; Load hold
-    rd_s4 !1 addi            ; Set toggle
-    $next_byte jal           ; Read next byte
-
-:combine
-    ; Combine half bytes
-    rd_s5 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
-    rd_a0 rs1_t0 rs2_s5 add  ; Combine two half bytes
-    ; Leaves the full byte in a0
-
-    ; Values are combined, now we write in the file
-    rs1_sp rs2_a0 sb         ; Store prepared byte in buffer
+:digit
+    rs1_s4 @first bltz       ; Negative means this is the first digit
+    rd_t0 rs1_t0 rs2_s4 or   ; Combine two half bytes
+    rs1_sp rs2_t0 sb         ; Store prepared byte in buffer
+    rd_a0 rs1_s3 mv
     rd_a7 !64 addi           ; sys_write
-    rd_a0 rs1_s3 mv          ; file descriptor (stdout)
     ecall
+    $pair jal
 
-    ; Update globals
-    rd_s4 mv                 ; Clear toggle
+:first
+    rd_s4 rs1_t0 rs2_x4 slli ; Shift logical left 4 times
+    $normal jal
 
-    ; Read next byte
-    $next_byte jal
+:read
+    rd_a0 rs1_s2 mv
+    rd_a7 !63 addi           ; sys_read
+    ecall
+    rs1_a0 @exit beqz        ; If the file ended (0 bytes read) terminate
+    rd_a0 rs1_sp lb
+    rs1_t2 jalr              ; Return to the caller
 
-:terminate
-    ; Terminate program with 0 return code
+:exit
     rd_a7 !93 addi           ; sys_exit
     ecall
-# PROGRAM END
 
 :ELF_end

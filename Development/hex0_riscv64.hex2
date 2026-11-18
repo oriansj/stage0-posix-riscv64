@@ -21,8 +21,7 @@
 ; Register use:
 ; s2: input fd
 ; s3: output fd
-; s4: toggle
-; s5: hold
+; s4: pending high nibble or -1
 
 ; Uses top of the stack as i/o buffer
 
@@ -73,8 +72,6 @@ F3 00              ## e_machine Indicating RISC-V
 01 00 00 00 00 00 00 00 ## Required alignment
 
 :_start
-    # rd_s4 mv                 ; Initialize register
-    .000A0000 13000000
     # rd_a1 rs1_sp !16 ld      ; Input file name
     .80050000 .00000100 .00000001 03300000
 
@@ -110,119 +107,99 @@ F3 00              ## e_machine Indicating RISC-V
     # rd_s3 rs1_a0 mv          ; Save fd in s3 for later
     .80090000 .00000500 13000000
 
-:next_byte
-    # rd_a7 !63 addi           ; sys_read
-    .80080000 .0000F003 13000000
-    # rd_a0 rs1_s2 mv          ; File descriptor
-    .00050000 .00000900 13000000
-    # rd_a1 rs1_sp mv          ; Buffer
+    # rd_a1 rs1_sp mv
     .80050000 .00000100 13000000
-    # rd_a2 !1 addi            ; Size of what we want to read (set for all subsequent syscalls)
+    # rd_a2 !1 addi
     .00060000 .00001000 13000000
-    # ecall
-    73000000
 
-    ; If the file ended (0 bytes read) terminate
-    # rs1_a0 @terminate beqz
-    .00000500 @terminate 63000000
+:pair
+    # rd_s4 !-1 addi           ; No high nibble yet
+    .000A0000 .0000F0FF 13000000
 
-    ; Check if it's a comment
-    # rd_a0 rs1_sp lb
-    .00050000 .00000100 03000000
-    # rd_t0 !0x23 addi
+:normal
+    # rd_t2 $read jal          ; Save the return address in t2
+    .80030000 $read 6F000000
+    # rd_t0 !35 addi           ; Check for '#'
     .80020000 .00003002 13000000
-    # rs1_a0 rs2_t0 @loop beq  ; a0 eq to '#'
-    .00000500 .00005000 @loop 63000000
-    # rd_t0 !0x3B addi
+    # rs1_a0 rs2_t0 @comment beq
+    .00000500 .00005000 @comment 63000000
+    # rd_t0 !59 addi           ; Check for ';'
     .80020000 .0000B003 13000000
-    # rs1_a0 rs2_t0 @not_comment bne
-    .00000500 .00005000 @not_comment 63100000
-:loop
-    # rd_a0 rs1_s2 mv              ; File descriptor
-    .00050000 .00000900 13000000
-    # ecall                        ; sys_read
-    73000000
+    # rs1_a0 rs2_t0 @decode bne
+    .00000500 .00005000 @decode 63100000
 
-        ; If the file ended (0 bytes read) terminate
-    # rs1_a0 @terminate beqz
-    .00000500 @terminate 63000000
-        ; Check if read byte is the end of the comment (i.e. a newline character),
-        ; in that case we continue processing
-    # rd_a0 rs1_sp lb
-    .00050000 .00000100 03000000
-    # rd_t0 !0xA addi
+:comment
+    # rd_t2 $read jal
+    .80030000 $read 6F000000
+    # rd_t0 !10 addi
     .80020000 .0000A000 13000000
-    # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \n
-    .00000500 .00005000 @next_byte 63000000
-    # rd_t0 !0xD addi
+    # rs1_a0 rs2_t0 @normal beq ; a0 eq to \n
+    .00000500 .00005000 @normal 63000000
+    # rd_t0 !13 addi
     .80020000 .0000D000 13000000
-    # rs1_a0 rs2_t0 @next_byte beq ; a0 eq to \r
-    .00000500 .00005000 @next_byte 63000000
-    # $loop jal
-    $loop 6F000000
+    # rs1_a0 rs2_t0 @comment bne ; CR also ends the comment
+    .00000500 .00005000 @comment 63100000
+    # $normal jal
+    $normal 6F000000
 
-:not_comment
+:decode
     # rd_t0 rs1_a0 !-48 addi   ; Subtract ASCII '0'
     .80020000 .00000500 .000000FD 13000000
-    # rd_t1 !10 addi
-    .00030000 .0000A000 13000000
-    # rs1_t0 rs2_t1 @hex_read bltu ; Unsigned range 0 through 9
-    .00800200 .00006000 @hex_read 63600000
+    # rd_t1 rs1_t0 !10 sltiu   ; Unsigned range 0 through 9
+    .00030000 .00800200 .0000A000 13300000
+    # rs1_t1 @digit bnez
+    .00000300 @digit 63100000
     # rd_t0 rs1_a0 !32 ori     ; Fold upper case to lower case
     .80020000 .00000500 .00000002 13600000
     # rd_t0 rs1_t0 !-97 addi
     .80020000 .00800200 .0000F0F9 13000000
-    # rd_t1 !6 addi
-    .00030000 .00006000 13000000
-    # rs1_t0 rs2_t1 @next_byte bgeu ; Not hex, continue reading
-    .00800200 .00006000 @next_byte 63700000
+    # rd_t1 rs1_t0 !6 sltiu
+    .00030000 .00800200 .00006000 13300000
+    # rs1_t1 @normal beqz      ; Not hex, continue reading
+    .00000300 @normal 63000000
     # rd_t0 rs1_t0 !10 addi
     .80020000 .00800200 .0000A000 13000000
-:hex_read
-    ; END check hex -- leaves the half byte in t0
 
-    # rs1_s4 @combine bnez     ; if toggle != 0 -> combine
-    .00000A00 @combine 63100000
-    ; Toggle == 0, we need to prepare for later
-    # rd_s5 rs1_t0 mv          ; Load hold
-    .800A0000 .00800200 13000000
-    # rd_s4 !1 addi            ; Set toggle
-    .000A0000 .00001000 13000000
-    # $next_byte jal           ; Read next byte
-    $next_byte 6F000000
-
-:combine
-    ; Combine half bytes
-    # rd_s5 rs1_s5 rs2_x4 slli ; Shift logical left 4 times
-    .800A0000 .00800A00 .00004000 13100000
-    # rd_a0 rs1_t0 rs2_s5 add  ; Combine two half bytes
-    .00050000 .00800200 .00005001 33000000
-    ; Leaves the full byte in a0
-
-    ; Values are combined, now we write in the file
-    # rs1_sp rs2_a0 sb         ; Store prepared byte in buffer
-    .00000100 .0000A000 23000000
+:digit
+    # rs1_s4 @first bltz       ; Negative means this is the first digit
+    .00000A00 @first 63400000
+    # rd_t0 rs1_t0 rs2_s4 or   ; Combine two half bytes
+    .80020000 .00800200 .00004001 33600000
+    # rs1_sp rs2_t0 sb         ; Store prepared byte in buffer
+    .00000100 .00005000 23000000
+    # rd_a0 rs1_s3 mv
+    .00050000 .00800900 13000000
     # rd_a7 !64 addi           ; sys_write
     .80080000 .00000004 13000000
-    # rd_a0 rs1_s3 mv          ; file descriptor (stdout)
-    .00050000 .00800900 13000000
     # ecall
     73000000
+    # $pair jal
+    $pair 6F000000
 
-    ; Update globals
-    # rd_s4 mv                 ; Clear toggle
-    .000A0000 13000000
+:first
+    # rd_s4 rs1_t0 rs2_x4 slli ; Shift logical left 4 times
+    .000A0000 .00800200 .00004000 13100000
+    # $normal jal
+    $normal 6F000000
 
-    ; Read next byte
-    # $next_byte jal
-    $next_byte 6F000000
+:read
+    # rd_a0 rs1_s2 mv
+    .00050000 .00000900 13000000
+    # rd_a7 !63 addi           ; sys_read
+    .80080000 .0000F003 13000000
+    # ecall
+    73000000
+    # rs1_a0 @exit beqz        ; If the file ended (0 bytes read) terminate
+    .00000500 @exit 63000000
+    # rd_a0 rs1_sp lb
+    .00050000 .00000100 03000000
+    # rs1_t2 jalr              ; Return to the caller
+    .00800300 67000000
 
-:terminate
-    ; Terminate program with 0 return code
+:exit
     # rd_a7 !93 addi           ; sys_exit
     .80080000 .0000D005 13000000
     # ecall
     73000000
-# PROGRAM END
 
 :ELF_end
